@@ -20,29 +20,31 @@ def extract_notes_from_list(page: object) -> list[dict]:
 
 @click.command()
 @click.option("--url", "-u", help="Single note URL to collect")
-@click.option("--account", "-a", help="User ID to collect notes from")
+@click.option("--user-id", "-uid", help="User ID to collect notes from")
 @click.option("--query", "-q", help="Search keyword")
 @click.option("--count", "-n", default=20, show_default=True, help="Max notes to collect")
 @click.option("--output", "-o", type=click.Path(), help="Output JSON file")
 @click.option("--headless", is_flag=True, help="Run browser headless")
 @click.option("--db", "to_db", is_flag=True, help="Store in database")
+@click.option("--account", "session_account", default="main", help="Session account name")
 def main(  # type: ignore[no-untyped-def]
-    url, account, query, count, output, headless, to_db
+    url, user_id, query, count, output, headless, to_db, session_account
 ) -> None:
     """Collect notes from Xiaohongshu."""
     results = []
 
     with Browser() as browser:
         browser.start()
-        page = browser.page()
+        ctx = browser.session_context(session_account)
+        page = ctx.new_page()
 
         if url:
             page.goto(url)
             data = extract_note_data(page)
             if data:
                 results.append(data)
-        elif account:
-            page.goto(f"https://www.xiaohongshu.com/user/profile/{account}")
+        elif user_id:
+            page.goto(f"https://www.xiaohongshu.com/user/profile/{user_id}")
             results = extract_notes_from_list(page)[:count]
         elif query:
             page.goto(f"https://www.xiaohongshu.com/search_result?keyword={query}")
