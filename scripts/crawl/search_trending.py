@@ -23,8 +23,18 @@ def search_keyword(page: object, keyword: str, sort: str, count: int) -> list[di
 @click.option("--db", "to_db", is_flag=True, help="Store in database")
 @click.option("--list-trending", is_flag=True, help="List recent trending keywords")
 @click.option("--headless", is_flag=True, help="Run browser headless")
+@click.option("--account", "session_account", default="main", help="Session account name")
 def main(  # type: ignore[no-untyped-def]
-    keyword, keywords_file, count, sort, days, output, to_db, list_trending, headless
+    keyword,
+    keywords_file,
+    count,
+    sort,
+    days,
+    output,
+    to_db,
+    list_trending,
+    headless,
+    session_account,
 ) -> None:
     """Search trending topics and notes on Xiaohongshu."""
     keywords = list(keyword)
@@ -55,7 +65,8 @@ def main(  # type: ignore[no-untyped-def]
     all_results = {}
     with Browser() as browser:
         browser.start()
-        page = browser.page()
+        ctx = browser.session_context(session_account)
+        page = ctx.new_page()
         for kw in keywords:
             click.echo(f"Searching: {kw}")
             results = search_keyword(page, kw, sort, count)

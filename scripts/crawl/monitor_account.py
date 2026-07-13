@@ -29,8 +29,9 @@ def extract_notes(page: object) -> list[dict]:
 @click.option("--days", default=30, show_default=True, help="Look back days")
 @click.option("--output", "-o", type=click.Path(), help="Output report path")
 @click.option("--headless", is_flag=True, help="Run browser headless")
+@click.option("--account", "session_account", default="main", help="Session account name")
 def main(  # type: ignore[no-untyped-def]
-    name, user_id, category, update, list_only, update_all, days, output, headless
+    name, user_id, category, update, list_only, update_all, days, output, headless, session_account
 ) -> None:
     """Monitor competitor accounts on Xiaohongshu."""
     init_db()
@@ -67,7 +68,8 @@ def main(  # type: ignore[no-untyped-def]
         )
         with Browser() as browser:
             browser.start()
-            page = browser.page()
+            ctx = browser.session_context(session_account)
+            page = ctx.new_page()
             page.goto(url)
 
             metrics = extract_metrics(page)
