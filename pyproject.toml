@@ -35,6 +35,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 exclude = [
     "frontend/",
+    "^scripts/",
 ]
 
 [tool.pytest.ini_options]
