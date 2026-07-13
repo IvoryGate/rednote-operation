@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 import json
 from datetime import datetime
 from pathlib import Path
@@ -27,15 +26,41 @@ IMAGE_SPECS = {
 }
 
 
+def _load_brief(path: str) -> dict:
+    with open(path) as f:
+        return json.load(f)
+
+
+def _extract_image_guidance(template_text: str) -> list[str]:
+    """Parse image suggestions from a template section."""
+    lines = template_text.splitlines()
+    capturing = False
+    specs = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("### ") and "图片" in stripped:
+            capturing = True
+            continue
+        if capturing:
+            if stripped.startswith("### ") or stripped.startswith("## "):
+                break
+            if stripped and (stripped[0].isdigit() or stripped.startswith("-")):
+                specs.append(stripped.lstrip("0123456789. -"))
+    return specs
+
+
 @click.command()
-@click.option("--input", "-i", type=click.Path(exists=True), help="Input draft JSON file")
+@click.option("--brief", "-b", type=click.Path(exists=True), help="Input brief JSON file")
 @click.option("--category", "-c", help="Content category (food/travel/digital)")
+@click.option("--topic", help="Post topic (used without --brief)")
 @click.option("--output", "-o", type=click.Path(), help="Output spec file")
 @click.option("--list-specs", is_flag=True, help="List available image specs")
-def main(  # type: ignore[no-untyped-def]
-    input, category, output, list_specs
-) -> None:
-    """Generate image specs for post content."""
+def main(brief, category, topic, output, list_specs):  # type: ignore[no-untyped-def]
+    """Generate image specs for post content.
+
+    Reads a brief JSON (from generate_post.py) and produces
+    per-slide image prompts and composition guidance.
+    """
     if list_specs:
         for cat, spec in IMAGE_SPECS.items():
             click.echo(f"\n[{cat}]")
@@ -43,31 +68,39 @@ def main(  # type: ignore[no-untyped-def]
                 click.echo(f"  {k}: {v}")
         return
 
-    draft = {}
-    if input:
-        with open(input) as f:
-            draft = json.load(f)
-        category = category or draft.get("category") or draft.get("template", "")
+    if brief:
+        data = _load_brief(brief)
+        meta = data.get("meta", {})
+        topic = topic or meta.get("topic", "")
+        category = category or meta.get("category", "")
+        template_text = data.get("template", "")
+    else:
+        template_text = ""
+        if not topic:
+            raise click.ClickException("Provide --topic (or --brief)")
+
+    category = category or "general"
 
     spec = IMAGE_SPECS.get(
         category,
-        {
-            "style": "清晰美观,符合平台调性",
-            "composition": "多角度拍摄",
-            "count": 6,
-            "notes": "参考同品类爆款图片风格",
-        },
+        {"style": "清晰美观,符合平台调性", "composition": "多角度拍摄", "count": 6, "notes": ""},
     )
 
+    image_guidance = _extract_image_guidance(template_text) or [spec["notes"]]
+
+    count = int(spec["count"])
+    image_prompts = []
+    for i in range(count):
+        guidance = image_guidance[i] if i < len(image_guidance) else spec["notes"]
+        image_prompts.append(
+            f"{topic} - 图{i + 1}: {guidance} | 风格: {spec['style']} | 构图: {spec['composition']}"
+        )
+
     result = {
-        "category": category or "general",
-        "title": draft.get("title", ""),
+        "meta": {"topic": topic, "category": category, "created_at": datetime.now().isoformat()},
         "image_spec": spec,
-        "image_prompts": [
-            f"{draft.get('title', '')} - 场景{i + 1}: {spec['style']}, {spec['composition']}"
-            for i in range(int(spec["count"]))
-        ],
-        "created_at": datetime.now().isoformat(),
+        "image_guidance": image_guidance,
+        "image_prompts": image_prompts,
     }
 
     if output:
