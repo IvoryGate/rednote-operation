@@ -22,13 +22,19 @@ class Browser:
         )
         return self
 
-    def context(self, user_data_dir: str | None = None) -> BrowserContext:
+    def context(
+        self, user_data_dir: str | None = None, storage_state: str | None = None
+    ) -> BrowserContext:
         if self._browser is None:
             raise RuntimeError("Browser not started. Call .start() first.")
 
         if user_data_dir:
             context_path = Path(user_data_dir)
             context_path.mkdir(parents=True, exist_ok=True)
+
+        state = storage_state or (
+            str(Path(user_data_dir) / "state.json") if user_data_dir else None
+        )
 
         self._context = self._browser.new_context(
             viewport={"width": 390, "height": 844},
@@ -37,9 +43,19 @@ class Browser:
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) "
                 "Version/17.0 Mobile/15E148 Safari/604.1"
             ),
-            storage_state=str(Path(user_data_dir) / "state.json") if user_data_dir else None,
+            storage_state=state if state and Path(state).exists() else None,
         )
         return self._context
+
+    def session_context(self, account_name: str = "main") -> BrowserContext:
+        """Create a context with a saved session for the given account."""
+        from src.core.session import SessionManager
+
+        session = SessionManager(account_name)
+        return self.context(
+            user_data_dir=session.get_user_data_dir(),
+            storage_state=str(session.state_file) if session.has_session() else None,
+        )
 
     def page(self) -> Page:
         if self._context is None:
