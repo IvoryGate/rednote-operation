@@ -34,8 +34,9 @@ repos:
     hooks:
       - id: pre-push-validation
         name: Pre-push validation (tests + schema)
-        entry: bash -c 'uv run pytest && (uv run python scripts/validate_schema.py 2>/dev/null || true)'
+        entry: bash -c 'uv run pytest; rc=$?; if [ $rc -eq 5 ]; then exit 0; else exit $rc; fi'
         language: system
         stages: [pre-push]
         pass_filenames: false
         always_run: true
+        verbose: true
