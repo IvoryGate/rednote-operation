@@ -1,0 +1,30 @@
+# RedNote Operation — Global Configuration
+
+app:
+  name: "RedNote Operation"
+  version: "0.1.0"
+  debug: true
+  log_level: "INFO"
+
+database:
+  url: "sqlite:///database/rednote.db"
+  echo: false
+
+browser:
+  headless: false
+  slow_mo: 100
+  user_data_dir: "./.browser-data"
+  timeout: 30000
+
+paths:
+  data: "./data"
+  logs: "./logs"
+  exports: "./exports"
+
+knowledge:
+  base_path: "./knowledge"
+  auto_index: true
+
+schedule:
+  timezone: "Asia/Shanghai"
+  default_interval_hours: 6

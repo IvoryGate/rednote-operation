@@ -1,0 +1,38 @@
+# RedNote Operation — Cursor Rules
+
+## Branch Strategy
+- Always branch from latest `main`: `git checkout main && git pull`
+- Branch naming: `<type>/<scope>-<description>`
+  - `feat/crawl-notes`, `fix/browser-timeout`, `knowledge/food-templates`, `docs/agents`
+- NEVER commit directly to `main`
+- Each branch = single concern, max 10 file changes
+
+## Commit Convention
+Format: `<type>(<scope>): <description>`
+Types: `feat`, `fix`, `knowledge`, `skills`, `docs`, `refactor`, `chore`, `test`
+Scopes: `core`, `scripts`, `crawl`, `analyze`, `create`, `publish`, `web`, `browser`, `db`, `config`
+Use imperative mood, lowercase, no period at end.
+Examples:
+- `feat(crawl): add note collection with keyword filtering`
+- `fix(browser): handle login session expiry`
+- `knowledge(food): add post templates for food category`
+
+## Pre-commit Verification
+- Always run `pre-commit run --all-files` before committing
+- Fix all lint/type errors before pushing
+- Never skip pre-commit checks
+
+## Pre-push Verification
+- Pushing to `main` triggers full test suite
+- Ensure all tests pass before merging PR
+
+## Workflow
+1. `git checkout main && git pull`
+2. `git checkout -b <type>/<scope>-<description>`
+3. Implement changes
+4. `pre-commit run --all-files` — fix any issues
+5. `git add . && git commit -m "<type>(<scope>): <description>"`
+6. `git push origin <branch-name>` — creates remote branch
+7. Create PR on GitHub → wait for CI → merge
+8. `git checkout main && git pull`
+9. Delete local branch: `git branch -d <branch-name>`
