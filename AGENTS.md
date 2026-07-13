@@ -50,8 +50,8 @@ The orchestrator agent follows this exact sequence for each task:
 |---------|------|
 | Base | Always `main`, always pull latest first |
 | Name | `<type>/<scope>-<description>` |
-| Types | `feat`, `fix`, `knowledge`, `skills`, `docs`, `refactor`, `chore`, `test` |
-| Scopes | `core`, `scripts`, `crawl`, `analyze`, `create`, `publish`, `web`, `browser`, `db`, `config`, `deps` |
+| Types | `feat`, `fix`, `docs`, `refactor`, `chore`, `test` |
+| Scopes | `core`, `scripts`, `crawl`, `analyze`, `create`, `publish`, `web`, `browser`, `db`, `config`, `deps`, `knowledge`, `skills` |
 | Scope | Exactly one concern per branch |
 | Size | Max 10 file changes |
 | History | Multiple commits allowed, no squash on merge |
@@ -62,12 +62,12 @@ The orchestrator agent follows this exact sequence for each task:
 <type>(<scope>): <imperative-description>
 ```
 
-Valid types: `feat`, `fix`, `knowledge`, `skills`, `docs`, `refactor`, `chore`, `test`
+Valid types: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`
 
 Examples:
 - `feat(crawl): add note collection script with keyword filter`
 - `fix(browser): handle login session expiration`
-- `knowledge(food): add food category post templates`
+- `feat(knowledge): add food category post templates`
 - `docs(agents): update orchestrator workflow`
 
 The commit-msg hook (via commitizen) enforces this format. Non-compliant commits

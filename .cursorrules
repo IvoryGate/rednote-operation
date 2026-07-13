@@ -3,19 +3,19 @@
 ## Branch Strategy
 - Always branch from latest `main`: `git checkout main && git pull`
 - Branch naming: `<type>/<scope>-<description>`
-  - `feat/crawl-notes`, `fix/browser-timeout`, `knowledge/food-templates`, `docs/agents`
+  - `feat/crawl-notes`, `fix/browser-timeout`, `feat/knowledge-food-templates`, `docs/agents`
 - NEVER commit directly to `main`
 - Each branch = single concern, max 10 file changes
 
 ## Commit Convention
 Format: `<type>(<scope>): <description>`
-Types: `feat`, `fix`, `knowledge`, `skills`, `docs`, `refactor`, `chore`, `test`
-Scopes: `core`, `scripts`, `crawl`, `analyze`, `create`, `publish`, `web`, `browser`, `db`, `config`
+Types: `feat`, `fix`, `docs`, `refactor`, `chore`, `test`
+Scopes: `core`, `scripts`, `crawl`, `analyze`, `create`, `publish`, `web`, `browser`, `db`, `config`, `knowledge`, `skills`
 Use imperative mood, lowercase, no period at end.
 Examples:
 - `feat(crawl): add note collection with keyword filtering`
 - `fix(browser): handle login session expiry`
-- `knowledge(food): add post templates for food category`
+- `feat(knowledge): add post templates for food category`
 
 ## Pre-commit Verification
 - Always run `pre-commit run --all-files` before committing
