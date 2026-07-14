@@ -61,4 +61,9 @@ class Config(BaseSettings):
         return cls.model_validate(data, strict=False)
 
 
-config = Config()
+def load_config(path: str | Path = "config/config.yaml") -> Config:
+    """Load config from YAML, falling back to defaults when the file is absent."""
+    return Config.from_yaml(path)
+
+
+config = load_config()
