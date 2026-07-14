@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.core.db import init_db
-from src.core.workflows import WorkflowRunner, WORKFLOWS, _build_analyze_performance
+from src.core.workflows import WORKFLOWS, WorkflowRunner, _build_analyze_performance
 
 
 def test_build_analyze_performance_cmd(tmp_path: Path) -> None:
@@ -36,8 +36,8 @@ def test_create_brief_requires_params() -> None:
 
 def test_sync_echo_style_job_via_python_c(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     # Replace analyze.performance builder with a harmless python one-liner.
-    def _echo(params: dict) -> list[str]:  # type: ignore[type-arg]
-        out = Path(params["output"])
+    def _echo(params: dict[str, object]) -> list[str]:
+        out = Path(str(params["output"]))
         return [
             "python",
             "-c",
@@ -73,7 +73,7 @@ def test_workflow_api_list_and_run(tmp_path: Path, monkeypatch) -> None:  # type
     monkeypatch.setattr("main.SessionLocal", session_factory)
     init_db()
 
-    def _echo(params: dict) -> list[str]:  # type: ignore[type-arg]
+    def _echo(_params: dict[str, object]) -> list[str]:
         return ["python", "-c", "print('workflow-ok')"]
 
     monkeypatch.setitem(
