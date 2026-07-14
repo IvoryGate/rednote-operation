@@ -51,7 +51,21 @@ def live_smoke(account: str, headless: bool) -> list[str]:
             except SelectorResolutionError as exc:
                 problems.append(str(exc))
 
-        for control in ("text_photo_tab", "upload_images", "image_input"):
+        # Default landing tab is video (「上传视频」). Switch to image+text
+        # before probing upload_images — same flow as publish_now.py.
+        try:
+            tab = resolve_locator(
+                page, registry, "text_photo_tab", timeout_ms=10000, state="attached"
+            )
+            try:
+                page.evaluate("(el) => el.click()", tab.element_handle())
+            except Exception:
+                tab.click(force=True)
+            page.wait_for_timeout(2000)
+        except SelectorResolutionError as exc:
+            problems.append(str(exc))
+
+        for control in ("upload_images", "image_input"):
             try:
                 resolve_locator(page, registry, control, timeout_ms=8000, state="attached")
             except SelectorResolutionError as exc:

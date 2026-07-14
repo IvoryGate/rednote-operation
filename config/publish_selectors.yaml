@@ -31,11 +31,12 @@ controls:
       - { type: css, value: "div:has-text('上传图文')" }
 
   upload_images:
-    description: Visible control that opens the file chooser
+    description: Visible control that opens the file chooser (image+text tab)
     strategies:
       - { type: text, value: "上传图片" }
       - { type: role, role: button, name: "上传图片" }
       - { type: css, value: "button:has-text('上传图片')" }
+      - { type: text, value: "拖拽图片到此或点击上传" }
 
   image_input:
     description: Hidden file input fallback
