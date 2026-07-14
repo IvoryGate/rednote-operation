@@ -18,9 +18,10 @@ data analysis, content creation, and auto publishing.
 ## Quick Start
 
 ```bash
-uv sync                     # Install dependencies
+uv sync                     # Install package + dependencies (editable)
 uv run playwright install   # Install browser engine
 uv run python main.py       # Start the API server
+uv run python scripts/crawl/login.py --help   # CLI scripts work without PYTHONPATH
 ```
 
 ## Development

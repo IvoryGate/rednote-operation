@@ -19,6 +19,15 @@ dependencies = [
     "pydantic-settings==2.14.2",
 ]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Install the top-level ``src`` package so ``uv run python scripts/...``
+# can ``import src`` without setting PYTHONPATH (script dir is sys.path[0]).
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
