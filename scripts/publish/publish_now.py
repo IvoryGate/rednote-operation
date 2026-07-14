@@ -62,9 +62,21 @@ def _open_publish_form(page) -> None:
     page.wait_for_timeout(2000)
 
     click.echo("  Selecting '上传图文' tab...")
-    tab = page.locator(SEL_PUBLISH_TAB_TEXTPHOTO).first
-    tab.wait_for(state="attached", timeout=10000)
-    tab.click(force=True)
+    try:
+        tab = page.locator(SEL_PUBLISH_TAB_TEXTPHOTO).first
+        tab.wait_for(state="attached", timeout=10000)
+        page.evaluate("(el) => el.click()", tab.element_handle())
+    except Exception:
+        click.echo("  Tab click failed, trying JS approach...")
+        page.evaluate("""
+            const spans = document.querySelectorAll('span.title');
+            for (const s of spans) {
+                if (s.textContent.includes('上传图文')) {
+                    s.click();
+                    break;
+                }
+            }
+        """)
 
     page.wait_for_timeout(3000)
     click.echo("  Waiting for publish form to load...")
