@@ -50,9 +50,8 @@ def _ensure_images(images: list[str]) -> list[str]:
 
 def _open_publish_form(page) -> None:
     """Navigate to creator platform and open the publish form."""
-    page.goto("https://creator.xiaohongshu.com/publish")
-    page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(2000)
+    page.goto("https://creator.xiaohongshu.com/publish", wait_until="domcontentloaded")
+    page.wait_for_timeout(3000)
 
     click.echo("  Clicking '发布笔记' to open publish form...")
     trigger = page.locator(SEL_PUBLISH_TRIGGER).first
