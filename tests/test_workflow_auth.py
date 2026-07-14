@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -20,9 +22,7 @@ from src.core.workflows import WORKFLOWS, WorkflowRunner
 
 
 def test_extract_token_prefers_x_api_token() -> None:
-    assert (
-        extract_token_from_headers("Bearer from-auth", "from-header") == "from-header"
-    )
+    assert extract_token_from_headers("Bearer from-auth", "from-header") == "from-header"
     assert extract_token_from_headers("Bearer only-auth", None) == "only-auth"
     assert extract_token_from_headers(None, None) is None
 
@@ -81,7 +81,7 @@ def test_submit_blocks_unconfirmed_live_publish() -> None:
 
 
 def test_workflow_api_rejects_missing_token(
-    tmp_path,  # type: ignore[no-untyped-def]
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     db_file = tmp_path / "api.db"
