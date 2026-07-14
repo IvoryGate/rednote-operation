@@ -22,7 +22,9 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 @click.command()
-@click.option("--brief", "-b", type=click.Path(exists=True), required=True, help="Filled brief JSON")
+@click.option(
+    "--brief", "-b", type=click.Path(exists=True), required=True, help="Filled brief JSON"
+)
 @click.option(
     "--images-json",
     type=click.Path(exists=True),
@@ -85,7 +87,9 @@ def main(  # type: ignore[no-untyped-def]
         for issue in issues:
             click.echo(f"  - {issue}")
         if strict:
-            raise click.ClickException(f"{len(issues)} quality issue(s); use --no-strict to continue")
+            raise click.ClickException(
+                f"{len(issues)} quality issue(s); use --no-strict to continue"
+            )
         click.echo("Continuing with --no-strict")
     else:
         click.echo("Quality check: OK")
