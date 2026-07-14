@@ -80,6 +80,73 @@ def _parse_count(text: str | None) -> int:
     return int(digits) if digits else 0
 
 
+def _count_or_none(text: str | None) -> int | None:
+    """Parse a count from text; return None when no digits are present."""
+    if not text or not str(text).strip():
+        return None
+    parsed = _parse_count(text)
+    # Empty / non-numeric texts already returned 0 from _parse_count with no digits.
+    if parsed == 0 and not re.search(r"\d", str(text)):
+        return None
+    return parsed
+
+
+def metric_hit_stats(
+    notes: list[dict[str, Any]],
+    *,
+    field: str = "view_count",
+) -> dict[str, Any]:
+    """Summarize extraction hit-rate for a metric field across parsed notes.
+
+    Prefer ``{field}_found`` boolean flags when present (set by card parsing).
+    Otherwise a hit is a present numeric value that is not the empty/missing
+    sentinel. For plain JSON exports without flags, ``view_count > 0`` is also
+    reported as ``positive_rate`` for a practical live-signal check.
+    """
+    total = len(notes)
+    hits = 0
+    positive = 0
+    misses = 0
+    flag_key = f"{field}_found"
+    for note in notes:
+        if flag_key in note:
+            found = bool(note.get(flag_key))
+            if found:
+                hits += 1
+                try:
+                    if int(note.get(field) or 0) > 0:
+                        positive += 1
+                except (TypeError, ValueError):
+                    pass
+            else:
+                misses += 1
+            continue
+
+        raw = note.get(field, None)
+        if raw is None or raw == "":
+            misses += 1
+            continue
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            misses += 1
+            continue
+        hits += 1
+        if value > 0:
+            positive += 1
+    rate = (hits / total) if total else 0.0
+    positive_rate = (positive / total) if total else 0.0
+    return {
+        "field": field,
+        "total": total,
+        "hits": hits,
+        "misses": misses,
+        "positive": positive,
+        "hit_rate": round(rate, 4),
+        "positive_rate": round(positive_rate, 4),
+    }
+
+
 def _first_text(card: Any, selectors: str) -> str | None:
     el = card.query_selector(selectors)
     if not el:
@@ -183,29 +250,36 @@ def parse_note_card(card: Any) -> dict[str, Any]:
         card_text = ""
     labeled = extract_counts_from_text(card_text)
 
-    like_count = labeled.get("like_count") or _parse_count(
-        like_el.inner_text() if like_el else None
-    )
-    view_count = labeled.get("view_count") or _parse_count(
-        view_el.inner_text()
-        if view_el
-        else _first_text(card, "[aria-label*=浏览], [aria-label*=阅读]")
-    )
-    collect_count = labeled.get("collect_count") or _parse_count(
-        collect_el.inner_text() if collect_el else None
-    )
-    comment_count = labeled.get("comment_count") or _parse_count(
-        comment_el.inner_text() if comment_el else None
-    )
+    like_count = labeled.get("like_count")
+    if like_count is None:
+        like_count = _count_or_none(like_el.inner_text() if like_el else None)
+
+    view_count = labeled.get("view_count")
+    if view_count is None:
+        view_raw = view_el.inner_text() if view_el else None
+        if not view_raw:
+            view_raw = _first_text(card, "[aria-label*=浏览], [aria-label*=阅读]")
+        view_count = _count_or_none(view_raw)
+
+    collect_count = labeled.get("collect_count")
+    if collect_count is None:
+        collect_count = _count_or_none(collect_el.inner_text() if collect_el else None)
+
+    comment_count = labeled.get("comment_count")
+    if comment_count is None:
+        comment_count = _count_or_none(comment_el.inner_text() if comment_el else None)
 
     item: dict[str, Any] = {
         "title": title,
         "author": author_el.inner_text().strip() if author_el else "",
         "cover": img_el.get_attribute("src") if img_el else "",
-        "like_count": like_count,
-        "view_count": view_count,
-        "collect_count": collect_count,
-        "comment_count": comment_count,
+        "like_count": like_count if like_count is not None else 0,
+        "view_count": view_count if view_count is not None else 0,
+        "collect_count": collect_count if collect_count is not None else 0,
+        "comment_count": comment_count if comment_count is not None else 0,
+        # Presence flags for hit-rate probes (True when extracted, not defaulted).
+        "view_count_found": view_count is not None,
+        "like_count_found": like_count is not None,
         "url": href,
         "note_id": extract_note_id_from_url(href),
     }

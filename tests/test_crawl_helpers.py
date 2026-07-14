@@ -122,6 +122,8 @@ def test_parse_note_card_includes_view_count() -> None:
     assert item["view_count"] == 5600
     assert item["collect_count"] == 20
     assert item["comment_count"] == 4
+    assert item["view_count_found"] is True
+    assert item["like_count_found"] is True
 
 
 def test_rate_limiter_backoff_and_decay(monkeypatch) -> None:  # type: ignore[no-untyped-def]

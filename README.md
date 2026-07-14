@@ -45,6 +45,23 @@ uv run python scripts/publish/smoke_selectors.py --live    # needs login session
 
 CI runs the offline check after pytest on every PR / push to `main`.
 
+### Crawl view_count hit-rate probe
+
+List cards often omit view counts; use this probe to measure extractor hit-rate.
+
+```bash
+# Offline: score a JSON export from search/collect
+uv run python scripts/crawl/probe_view_count.py --input exports/search.json
+
+# Live: needs login session (scripts/crawl/login.py)
+uv run python scripts/crawl/probe_view_count.py --live -k 美食 -n 20 --account main --headless
+
+# Optional gate (fails if hit_rate below threshold)
+uv run python scripts/crawl/probe_view_count.py --input exports/search.json --min-hit-rate 0.2
+```
+
+Parsed cards include `view_count_found` so zero defaults are not counted as hits.
+
 ### Workflow API auth
 
 `POST /api/workflows/{name}/run` accepts `Authorization: Bearer <token>` or `X-API-Token`.
