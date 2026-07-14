@@ -46,7 +46,9 @@ uv run python scripts/crawl/login.py list
 
 ```bash
 uv run python scripts/crawl/login.py login --account main
-# 浏览器打开创作者登录页 → 手动登录成功 → 回终端按 Enter
+# 浏览器会依次检查：
+# 1) 创作者中心 — 未登录则扫码/登录，脚本自动轮询最多 180s
+# 2) www 搜索 — 若出现「登录后查看搜索结果」再扫一次（创作者 cookie 通常不够用）
 ```
 
 校验：
@@ -55,9 +57,11 @@ uv run python scripts/crawl/login.py login --account main
 uv run python scripts/crawl/login.py status --account main
 ```
 
-应看到 `Logged in: 'main'`。过期则：
+应看到 `Logged in: 'main' (creator + www)`。只有 creator、www 仍锁时提示 `Partial login`，再跑一遍 login 即可：
 
 ```bash
+uv run python scripts/crawl/login.py login --account main
+# 或强制重登：
 uv run python scripts/crawl/login.py login --account main --force
 ```
 

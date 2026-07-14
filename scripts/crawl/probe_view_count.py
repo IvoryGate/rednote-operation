@@ -48,10 +48,19 @@ def _live_notes(keyword: str, count: int, account: str, headless: bool) -> list[
         backoff_factor=config.crawl.backoff_factor,
         jitter=config.crawl.jitter_seconds,
     )
+    from src.core.browser import DESKTOP_UA, DESKTOP_VIEWPORT
+
     browser = Browser()
     browser.start(headless=headless)
     try:
-        ctx = browser.session_context(account)
+        # Desktop identity matches login capture; mobile UA often hits the
+        # www search QR wall even when creator cookies are present.
+        ctx = browser.session_context(
+            account,
+            viewport=DESKTOP_VIEWPORT,
+            user_agent=DESKTOP_UA,
+            rotate_identity=False,
+        )
         page = ctx.new_page()
         limiter.wait()
         page.goto(
