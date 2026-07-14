@@ -50,8 +50,24 @@ class ScheduleConfig(BaseModel):
     default_interval_hours: int = 6
 
 
+class SecurityConfig(BaseModel):
+    """API / workflow protection.
+
+    Prefer env ``REDNOTE_API_TOKEN`` or ``REDNOTE_SECURITY__API_TOKEN``.
+    When the effective token is non-empty, POST /api/workflows/*/run requires it.
+    """
+
+    api_token: str = ""
+    # When true, refuse workflow runs if no token is configured.
+    require_token: bool = False
+
+
 class Config(BaseSettings):
-    model_config = SettingsConfigDict(extra="ignore")
+    model_config = SettingsConfigDict(
+        extra="ignore",
+        env_nested_delimiter="__",
+        env_prefix="REDNOTE_",
+    )
 
     app: AppConfig = AppConfig()
     database: DatabaseConfig = DatabaseConfig()
@@ -60,6 +76,7 @@ class Config(BaseSettings):
     paths: PathsConfig = PathsConfig()
     knowledge: KnowledgeConfig = KnowledgeConfig()
     schedule: ScheduleConfig = ScheduleConfig()
+    security: SecurityConfig = SecurityConfig()
 
     @classmethod
     def from_yaml(cls, path: str | Path = "config/config.yaml") -> "Config":

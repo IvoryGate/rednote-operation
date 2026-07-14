@@ -20,6 +20,15 @@
 
     <n-card title="自定义运行">
       <n-form label-placement="left" label-width="110">
+        <n-form-item label="API Token">
+          <n-input
+            v-model:value="apiToken"
+            type="password"
+            show-password-on="click"
+            placeholder="服务端开启 token 时填写；仅存本机 localStorage"
+            @update:value="onTokenChange"
+          />
+        </n-form-item>
         <n-form-item label="工作流">
           <n-select
             v-model:value="selected"
@@ -63,7 +72,7 @@
 import { computed, h, onMounted, ref } from 'vue'
 import { NTag } from 'naive-ui'
 import type { DataTableColumn } from 'naive-ui'
-import { api, type WorkflowInfo, type WorkflowJob } from '../api'
+import { api, getApiToken, setApiToken, type WorkflowInfo, type WorkflowJob } from '../api'
 
 const workflows = ref<WorkflowInfo[]>([])
 const jobs = ref<WorkflowJob[]>([])
@@ -71,8 +80,14 @@ const loadingJobs = ref(false)
 const running = ref<string | null>(null)
 const selected = ref<string | null>(null)
 const paramsText = ref('{}')
+const apiToken = ref(getApiToken())
 const message = ref('')
 const messageType = ref<'success' | 'error' | 'info'>('info')
+
+function onTokenChange(value: string) {
+  apiToken.value = value
+  setApiToken(value)
+}
 
 const safeWorkflows = computed(() =>
   workflows.value.filter((w) => !w.requires_browser),

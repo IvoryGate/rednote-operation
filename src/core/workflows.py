@@ -276,7 +276,10 @@ class WorkflowRunner:
         if workflow not in WORKFLOWS:
             raise KeyError(f"Unknown workflow: {workflow}")
         spec = WORKFLOWS[workflow]
+        from src.core.workflow_auth import guard_workflow_params
+
         merged = {**spec.default_params, **(params or {})}
+        merged = guard_workflow_params(workflow, merged)
         # Validate command build early for clear API errors
         cmd = spec.build_cmd(merged)
         job = Job(

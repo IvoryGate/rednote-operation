@@ -36,3 +36,10 @@ knowledge:
 schedule:
   timezone: "Asia/Shanghai"
   default_interval_hours: 6
+
+# Workflow / API protection. Prefer env REDNOTE_SECURITY__API_TOKEN in production.
+# When api_token is non-empty, POST /api/workflows/{name}/run requires
+# Authorization: Bearer <token> (or X-API-Token).
+security:
+  api_token: ""
+  require_token: false
