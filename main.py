@@ -20,6 +20,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_frontend = Path("frontend/dist")
+if _frontend.exists():
+    app.mount("/", StaticFiles(directory=str(_frontend), html=True), name="frontend")
+
 
 @app.get("/api/dashboard/stats")
 async def dashboard_stats() -> dict:
@@ -155,9 +159,6 @@ async def list_keywords(top: int = Query(50)) -> list:
 
 def main() -> None:
     init_db()
-    frontend = Path("frontend/dist")
-    if frontend.exists():
-        app.mount("/", StaticFiles(directory=str(frontend), html=True), name="frontend")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
 
