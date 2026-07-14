@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from click.testing import CliRunner
 
@@ -12,7 +13,7 @@ from src.core.crawl_parse import metric_hit_stats, parse_note_card
 
 
 def test_metric_hit_stats_with_found_flags() -> None:
-    notes = [
+    notes: list[dict[str, Any]] = [
         {"view_count": 100, "view_count_found": True},
         {"view_count": 0, "view_count_found": False},
         {"view_count": 0, "view_count_found": True},
@@ -26,7 +27,7 @@ def test_metric_hit_stats_with_found_flags() -> None:
 
 
 def test_metric_hit_stats_without_flags_uses_presence() -> None:
-    notes = [
+    notes: list[dict[str, Any]] = [
         {"view_count": 10},
         {"view_count": None},
         {"view_count": 0},
@@ -55,6 +56,9 @@ class _FakeNode:
         return None
 
 
+_LIKE_SEL = "[class*=like] [class*=count], [class*=like-count], [class*=like] span, [class*=like]"
+
+
 class _CardNoViews:
     def query_selector(self, sel: str) -> _FakeNode | None:
         nodes = {
@@ -64,9 +68,7 @@ class _CardNoViews:
             "a[href*='/explore/'], a[href*='/discovery/item/'], a": _FakeNode(
                 href="/explore/abcdef0123456789abcdef01"
             ),
-            "[class*=like] [class*=count], [class*=like-count], [class*=like] span, [class*=like]": (
-                _FakeNode(text="12")
-            ),
+            _LIKE_SEL: _FakeNode(text="12"),
         }
         return nodes.get(sel)
 
