@@ -44,9 +44,10 @@ def main(add, draft, publish_time, account, daemon, interval) -> None:
                 draft_data = {
                     "title": item.title or "",
                     "content": item.content or "",
-                    "tags": [],
+                    "tags": json.loads(item.tags) if item.tags else [],
+                    "images": json.loads(item.images) if item.images else [],
                 }
-                success = _publish_via_browser(draft_data, account)
+                success = _publish_via_browser(draft_data, account, dry_run=False)
                 if success:
                     item.status = "published"
                     item.published_at = now
