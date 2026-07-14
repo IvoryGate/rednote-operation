@@ -20,6 +20,7 @@ data analysis, content creation, and auto publishing.
 ```bash
 uv sync                     # Install package + dependencies (editable)
 uv run playwright install   # Install browser engine
+uv run alembic upgrade head # Apply database migrations
 uv run python main.py       # Start the API server
 uv run python scripts/crawl/login.py --help   # CLI scripts work without PYTHONPATH
 ```
