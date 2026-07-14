@@ -43,6 +43,8 @@ uv run python scripts/publish/smoke_selectors.py           # offline YAML/regist
 uv run python scripts/publish/smoke_selectors.py --live    # needs login session
 ```
 
+CI runs the offline check after pytest on every PR / push to `main`.
+
 ### Workflow API auth
 
 `POST /api/workflows/{name}/run` accepts `Authorization: Bearer <token>` or `X-API-Token`.

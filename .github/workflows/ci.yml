@@ -28,3 +28,5 @@ jobs:
           enable-cache: true
       - run: uv sync --group dev
       - run: uv run pytest
+      - name: Publish selector smoke (offline)
+        run: uv run python scripts/publish/smoke_selectors.py
