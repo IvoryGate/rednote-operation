@@ -15,7 +15,6 @@ from src.core.metrics import (
     viral_rate,
 )
 
-
 SAMPLE = [
     {
         "title": "A #美食",
