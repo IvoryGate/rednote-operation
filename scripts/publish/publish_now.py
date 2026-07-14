@@ -63,8 +63,8 @@ def _open_publish_form(page) -> None:
 
     click.echo("  Selecting '上传图文' tab...")
     tab = page.locator(SEL_PUBLISH_TAB_TEXTPHOTO).first
-    tab.wait_for(state="visible", timeout=10000)
-    tab.click()
+    tab.wait_for(state="attached", timeout=10000)
+    tab.click(force=True)
 
     page.wait_for_timeout(3000)
     click.echo("  Waiting for publish form to load...")
