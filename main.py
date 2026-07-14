@@ -20,10 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_frontend = Path("frontend/dist")
-if _frontend.exists():
-    app.mount("/", StaticFiles(directory=str(_frontend), html=True), name="frontend")
-
 
 @app.get("/api/dashboard/stats")
 async def dashboard_stats() -> dict:
@@ -155,6 +151,12 @@ async def list_keywords(top: int = Query(50)) -> list:
         ]
     finally:
         db.close()
+
+
+# Mount static frontend AFTER API routes so "/" does not shadow /api/*.
+_frontend = Path("frontend/dist")
+if _frontend.exists():
+    app.mount("/", StaticFiles(directory=str(_frontend), html=True), name="frontend")
 
 
 def main() -> None:

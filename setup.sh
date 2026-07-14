@@ -12,7 +12,7 @@ uv run playwright install chromium
 # Create data directories
 mkdir -p data logs exports .browser-data
 
-# Initialize database
+# Initialize database (imports ORM models before create_all)
 uv run python -c "from src.core.db import init_db; init_db()"
 
 echo ""

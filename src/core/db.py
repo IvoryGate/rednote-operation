@@ -28,6 +28,9 @@ def get_db() -> Generator[Session]:
 
 
 def init_db(sql_path: str | Path | None = None) -> None:
+    # Import models so SQLAlchemy registers all mapped tables on Base.metadata.
+    import src.models  # noqa: F401
+
     if sql_path:
         sql_path = Path(sql_path)
         if sql_path.exists():
