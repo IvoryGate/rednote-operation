@@ -71,10 +71,20 @@ def main(add, draft, publish_time, account, daemon, interval) -> None:
         db = SessionLocal()
         with open(draft) as f:
             draft_data = json.load(f)
+        from src.core.content_pipeline import build_publish_draft
+
+        # Accept both finalized drafts and AI-filled briefs.
+        normalized = build_publish_draft(draft_data)
         entry = PublishQueue(
             account_id=1,
-            title=draft_data.get("title", ""),
-            content=draft_data.get("content", ""),
+            title=normalized.get("title", ""),
+            content=normalized.get("content", ""),
+            images=json.dumps(normalized["images"], ensure_ascii=False)
+            if normalized.get("images")
+            else None,
+            tags=json.dumps(normalized["tags"], ensure_ascii=False)
+            if normalized.get("tags")
+            else None,
             scheduled_at=datetime.fromisoformat(publish_time),
             status="pending",
         )
