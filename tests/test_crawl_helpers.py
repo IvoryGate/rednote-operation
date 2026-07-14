@@ -9,7 +9,7 @@ from src.core.crawl_parse import (
     page_looks_rejected,
     synthesize_note_id,
 )
-from src.core.headers import HeaderPool, USER_AGENT_POOL
+from src.core.headers import USER_AGENT_POOL, HeaderPool
 from src.core.rate_limit import RateLimiter
 
 

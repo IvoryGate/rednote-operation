@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 import random
-from typing import Iterator
+from collections.abc import Iterator
 
 # Realistic desktop/mobile Chrome UAs — rotated per browser context.
 USER_AGENT_POOL: tuple[str, ...] = (
