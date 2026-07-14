@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from src.core.crawl_parse import (
     ensure_note_id,
+    extract_counts_from_text,
+    extract_metrics_from_html,
     extract_note_id_from_url,
     note_fields_for_db,
     page_looks_rejected,
+    parse_note_card,
     synthesize_note_id,
 )
 from src.core.headers import USER_AGENT_POOL, HeaderPool
@@ -45,13 +48,80 @@ def test_note_fields_for_db_filters_unknown_keys() -> None:
             "author": "should-drop",
             "cover": "should-drop",
             "like_count": 10,
+            "view_count": 999,
         }
     )
     assert fields["note_id"] == "abcdef0123456789abcdef01"
     assert fields["title"] == "t"
     assert fields["like_count"] == 10
+    assert fields["view_count"] == 999
     assert "author" not in fields
     assert "cover" not in fields
+
+
+def test_extract_counts_from_labeled_text() -> None:
+    blob = "点赞 1.2万 收藏：300 评论 12 浏览 8.5万"
+    counts = extract_counts_from_text(blob)
+    assert counts["like_count"] == 12000
+    assert counts["collect_count"] == 300
+    assert counts["comment_count"] == 12
+    assert counts["view_count"] == 85000
+
+
+def test_extract_metrics_from_html_initial_state() -> None:
+    html = """
+    <script>window.__INITIAL_STATE__={"note":{"likedCount":88,"collectedCount":9,
+    "commentCount":3,"viewCount":1500}}</script>
+    """
+    metrics = extract_metrics_from_html(html)
+    assert metrics["like_count"] == 88
+    assert metrics["collect_count"] == 9
+    assert metrics["comment_count"] == 3
+    assert metrics["view_count"] == 1500
+
+
+class _FakeNode:
+    def __init__(self, *, text: str = "", href: str | None = None, src: str | None = None) -> None:
+        self._text = text
+        self._href = href
+        self._src = src
+
+    def inner_text(self) -> str:
+        return self._text
+
+    def get_attribute(self, name: str) -> str | None:
+        if name == "href":
+            return self._href
+        if name == "src":
+            return self._src
+        return None
+
+
+class _FakeCard:
+    def __init__(self) -> None:
+        self._nodes = {
+            ".note-title, .title, [class*=title]": _FakeNode(text="测试笔记"),
+            ".author, [class*=author], [class*=name]": _FakeNode(text="作者"),
+            "img": _FakeNode(src="https://img/x.jpg"),
+            "a[href*='/explore/'], a[href*='/discovery/item/'], a": _FakeNode(
+                href="/explore/abcdef0123456789abcdef01"
+            ),
+        }
+
+    def query_selector(self, sel: str) -> _FakeNode | None:
+        return self._nodes.get(sel)
+
+    def inner_text(self) -> str:
+        return "测试笔记\n点赞 128\n收藏 20\n浏览 5600\n评论 4"
+
+
+def test_parse_note_card_includes_view_count() -> None:
+    item = parse_note_card(_FakeCard())
+    assert item["note_id"] == "abcdef0123456789abcdef01"
+    assert item["like_count"] == 128
+    assert item["view_count"] == 5600
+    assert item["collect_count"] == 20
+    assert item["comment_count"] == 4
 
 
 def test_rate_limiter_backoff_and_decay(monkeypatch) -> None:  # type: ignore[no-untyped-def]
