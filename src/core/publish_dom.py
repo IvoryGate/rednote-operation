@@ -12,6 +12,17 @@ import yaml
 DEFAULT_SELECTORS_PATH = Path("config/publish_selectors.yaml")
 DEFAULT_EVIDENCE_DIR = Path("data/screenshots/failures")
 
+REQUIRED_CONTROLS = (
+    "publish_trigger",
+    "text_photo_tab",
+    "upload_images",
+    "image_input",
+    "title",
+    "content",
+    "publish_button",
+    "publish_success",
+)
+
 
 class SelectorResolutionError(LookupError):
     """Raised when every strategy for a control fails."""
@@ -168,3 +179,18 @@ def dump_failure_evidence(
         note_lines.append(f"  - {item}")
     (out / "tried.txt").write_text("\n".join(note_lines) + "\n", encoding="utf-8")
     return out
+
+
+def offline_smoke(registry: SelectorRegistry | None = None) -> list[str]:
+    """Validate committed selector registry shape. Empty list means pass."""
+    reg = registry or SelectorRegistry.load()
+    problems: list[str] = []
+    if reg.version < 1:
+        problems.append(f"invalid registry version: {reg.version}")
+    for name in REQUIRED_CONTROLS:
+        if name not in reg.controls:
+            problems.append(f"missing control: {name}")
+            continue
+        if not reg.controls[name].strategies:
+            problems.append(f"control has no strategies: {name}")
+    return problems

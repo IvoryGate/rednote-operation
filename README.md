@@ -25,6 +25,24 @@ uv run python main.py       # Start the API server
 uv run python scripts/crawl/login.py --help   # CLI scripts work without PYTHONPATH
 ```
 
+### Existing database (created before Alembic)
+
+If `database/rednote.db` already exists from `create_all` / older setup:
+
+```bash
+uv run alembic stamp head   # mark current schema as baseline without recreating tables
+```
+
+Only run `upgrade head` on empty DBs or after reviewing new revisions.
+New schema changes: `uv run alembic revision --autogenerate -m "..." && uv run alembic upgrade head`.
+
+### Publish selector smoke
+
+```bash
+uv run python scripts/publish/smoke_selectors.py           # offline YAML/registry check
+uv run python scripts/publish/smoke_selectors.py --live    # needs login session
+```
+
 ## Development
 
 ```bash
