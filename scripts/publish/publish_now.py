@@ -18,8 +18,9 @@ from src.models import PublishQueue
 # the form has loaded.
 
 SEL_PUBLISH_TRIGGER = "text=发布笔记"
+SEL_PUBLISH_TAB_TEXTPHOTO = "text=上传图文"
 SEL_PUBLISH_BTN = "button:has-text('发布')"
-SEL_IMAGE_INPUT = "input[type=file]"
+SEL_IMAGE_INPUT = "input.upload-input, input[type=file]"
 SEL_UPLOAD_AREA = ".upload-container, [class*=upload], [class*=dropzone]"
 SEL_TITLE = "input[placeholder*=标题], #title, [class*=title] input"
 SEL_CONTENT = "[contenteditable], .DraftEditor-editorContainer, [class*=ql-editor]"
@@ -57,6 +58,13 @@ def _open_publish_form(page) -> None:
     trigger = page.locator(SEL_PUBLISH_TRIGGER).first
     trigger.wait_for(state="visible", timeout=15000)
     trigger.click()
+
+    page.wait_for_timeout(2000)
+
+    click.echo("  Selecting '上传图文' tab...")
+    tab = page.locator(SEL_PUBLISH_TAB_TEXTPHOTO).first
+    tab.wait_for(state="visible", timeout=10000)
+    tab.click()
 
     page.wait_for_timeout(3000)
     click.echo("  Waiting for publish form to load...")
