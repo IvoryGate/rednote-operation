@@ -5,6 +5,7 @@ from playwright.sync_api import Browser as PlaywrightBrowser
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
 from src.core.config import config
+from src.core.headers import default_header_pool
 
 DESKTOP_VIEWPORT = {"width": 1440, "height": 900}
 DESKTOP_UA = (
@@ -21,16 +22,18 @@ MOBILE_UA = (
 
 
 class Browser:
-    def __init__(self) -> None:
+    def __init__(self, headless: bool | None = None) -> None:
         self._playwright: Playwright | None = None
         self._browser: PlaywrightBrowser | None = None
         self._context: BrowserContext | None = None
         self._headless: bool | None = None
+        self._headless_opt = headless
 
     def start(self, headless: bool | None = None) -> Self:
         ctx_mgr = sync_playwright()
         self._playwright = ctx_mgr.__enter__()
-        self._headless = headless if headless is not None else config.browser.headless
+        resolved = headless if headless is not None else self._headless_opt
+        self._headless = resolved if resolved is not None else config.browser.headless
         self._browser = self._playwright.chromium.launch(
             headless=self._headless,
             slow_mo=config.browser.slow_mo,
@@ -43,6 +46,9 @@ class Browser:
         storage_state: str | None = None,
         viewport: dict | None = None,
         user_agent: str | None = None,
+        extra_headers: dict[str, str] | None = None,
+        *,
+        rotate_identity: bool = False,
     ) -> BrowserContext:
         if self._browser is None:
             raise RuntimeError("Browser not started. Call .start() first.")
@@ -55,10 +61,19 @@ class Browser:
             str(Path(user_data_dir) / "state.json") if user_data_dir else None
         )
 
+        headers = dict(extra_headers or {})
+        ua = user_agent
+        if rotate_identity:
+            identity = default_header_pool.next_headers()
+            ua = ua or identity["User-Agent"]
+            headers.setdefault("Accept-Language", identity["Accept-Language"])
+            headers.setdefault("Accept", identity["Accept"])
+
         self._context = self._browser.new_context(
             viewport=viewport or MOBILE_VIEWPORT,
-            user_agent=user_agent or MOBILE_UA,
+            user_agent=ua or MOBILE_UA,
             storage_state=state if state and Path(state).exists() else None,
+            extra_http_headers=headers or None,
         )
         return self._context
 
@@ -67,6 +82,8 @@ class Browser:
         account_name: str = "main",
         viewport: dict | None = None,
         user_agent: str | None = None,
+        *,
+        rotate_identity: bool = True,
     ) -> BrowserContext:
         """Create a context with a saved session for the given account."""
         from src.core.session import SessionManager
@@ -77,6 +94,7 @@ class Browser:
             storage_state=str(session.state_file) if session.has_session() else None,
             viewport=viewport,
             user_agent=user_agent,
+            rotate_identity=rotate_identity,
         )
 
     def page(self) -> Page:
@@ -93,7 +111,7 @@ class Browser:
             self._playwright.stop()
 
     def __enter__(self) -> Self:
-        return self.start()
+        return self.start(headless=self._headless_opt)
 
     def __exit__(self, *args: object) -> None:
         self.close()

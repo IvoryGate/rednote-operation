@@ -25,6 +25,15 @@ class BrowserConfig(BaseModel):
     timeout: int = 30000
 
 
+class CrawlConfig(BaseModel):
+    """Anti-bot pacing for crawl scripts (no proxy/IP pool)."""
+
+    min_interval_seconds: float = 2.0
+    max_interval_seconds: float = 60.0
+    backoff_factor: float = 2.0
+    jitter_seconds: float = 0.5
+
+
 class PathsConfig(BaseModel):
     data: str = "./data"
     logs: str = "./logs"
@@ -47,6 +56,7 @@ class Config(BaseSettings):
     app: AppConfig = AppConfig()
     database: DatabaseConfig = DatabaseConfig()
     browser: BrowserConfig = BrowserConfig()
+    crawl: CrawlConfig = CrawlConfig()
     paths: PathsConfig = PathsConfig()
     knowledge: KnowledgeConfig = KnowledgeConfig()
     schedule: ScheduleConfig = ScheduleConfig()
