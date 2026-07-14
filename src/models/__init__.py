@@ -94,9 +94,13 @@ class PublishQueue(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     account_id: Mapped[int] = mapped_column(nullable=False)
-    content_id: Mapped[int | None]
+    calendar_id: Mapped[int | None]
+    title: Mapped[str] = mapped_column(nullable=False)
+    content: Mapped[str | None]
+    images: Mapped[str | None]
+    tags: Mapped[str | None]
     status: Mapped[str] = mapped_column(default="pending")
-    scheduled_for: Mapped[datetime | None]
+    scheduled_at: Mapped[datetime | None]
     published_at: Mapped[datetime | None]
     error_message: Mapped[str | None]
     retry_count: Mapped[int] = mapped_column(default=0)
