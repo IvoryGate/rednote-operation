@@ -1,12 +1,34 @@
-# mypy: ignore-errors
+"""Extract and analyze keyword/hashtag insights."""
+
+from __future__ import annotations
+
 import json
-from collections import Counter
 from pathlib import Path
+from typing import Any
 
 import click
 
 from src.core.db import SessionLocal, init_db
+from src.core.metrics import extract_tags, tag_insights
 from src.models import Keyword, Note
+
+
+def _notes_from_db() -> list[dict[str, Any]]:
+    init_db()
+    db = SessionLocal()
+    try:
+        rows = db.query(Note).all()
+        return [
+            {
+                "title": r.title,
+                "content": r.content,
+                "tags": r.tags,
+                "like_count": r.like_count,
+            }
+            for r in rows
+        ]
+    finally:
+        db.close()
 
 
 @click.command()
@@ -19,50 +41,53 @@ def main(  # type: ignore[no-untyped-def]
     input, from_db, top, output, update_db
 ) -> None:
     """Extract and analyze keyword/hashtag insights."""
-    notes = []
+    notes: list[dict[str, Any]] = []
 
     if input:
         with open(input) as f:
-            notes = json.load(f)
+            loaded = json.load(f)
+        if isinstance(loaded, dict) and "notes" in loaded:
+            notes = list(loaded["notes"])
+        elif isinstance(loaded, list):
+            notes = loaded
+        else:
+            click.echo("Input JSON must be a list of notes or {notes: [...]}")
+            return
     elif from_db:
-        init_db()
-        db = SessionLocal()
-        results = db.query(Note).filter(Note.tags.isnot(None)).all()
-        for r in results:
-            notes.append({"title": r.title, "tags": r.tags, "like_count": r.like_count})
-        db.close()
+        notes = _notes_from_db()
     else:
         click.echo("Provide --input or --from-db")
         return
 
-    all_tags = []
-    for n in notes:
-        tags = n.get("tags", "") or ""
-        if isinstance(tags, str):
-            all_tags.extend(t.strip() for t in tags.split(",") if t.strip())
+    ranked = tag_insights(notes, top=top)
+    all_tag_mentions = sum(len(extract_tags(n)) for n in notes)
 
-    tag_counts = Counter(all_tags)
-    top_tags = tag_counts.most_common(top)
-
-    report_lines = ["# Keyword & Hashtag Insights\n"]
-    report_lines.append(f"Total tags found: {len(all_tags)}")
-    report_lines.append(f"Unique tags: {len(tag_counts)}\n")
-    report_lines.append(f"## Top {top} Tags\n")
-    for i, (tag, count) in enumerate(top_tags, 1):
-        report_lines.append(f"{i}. #{tag} — {count} mentions")
+    report_lines = [
+        "# Keyword & Hashtag Insights\n",
+        f"Notes scanned: {len(notes)}",
+        f"Tag mentions: {all_tag_mentions}",
+        f"Unique tags (top window): {len(ranked)}\n",
+        f"## Top {top} Tags\n",
+        "| Rank | Tag | Mentions | Avg likes |",
+        "|---:|---|---:|---:|",
+    ]
+    for i, row in enumerate(ranked, 1):
+        report_lines.append(f"| {i} | #{row['tag']} | {row['mentions']} | {row['avg_likes']:.1f} |")
 
     if update_db:
         init_db()
         db = SessionLocal()
-        for tag, count in top_tags:
-            existing = db.query(Keyword).filter(Keyword.keyword == tag).first()
-            if existing:
-                existing.search_volume = count
-            else:
-                db.add(Keyword(keyword=tag, search_volume=count))
-        db.commit()
-        db.close()
-        click.echo(f"Updated {len(top_tags)} keywords in DB")
+        try:
+            for row in ranked:
+                existing = db.query(Keyword).filter(Keyword.keyword == row["tag"]).first()
+                if existing:
+                    existing.search_volume = row["mentions"]
+                else:
+                    db.add(Keyword(keyword=row["tag"], search_volume=row["mentions"]))
+            db.commit()
+            click.echo(f"Updated {len(ranked)} keywords in DB")
+        finally:
+            db.close()
 
     report = "\n".join(report_lines)
 
