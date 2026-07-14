@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from playwright.sync_api import Browser as PlaywrightBrowser
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
@@ -7,7 +7,8 @@ from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwrigh
 from src.core.config import config
 from src.core.headers import default_header_pool
 
-DESKTOP_VIEWPORT = {"width": 1440, "height": 900}
+# Default identity is desktop. Mobile is opt-in only (explicit viewport/UA).
+DESKTOP_VIEWPORT = {"width": 1920, "height": 1080}
 DESKTOP_UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -34,9 +35,14 @@ class Browser:
         self._playwright = ctx_mgr.__enter__()
         resolved = headless if headless is not None else self._headless_opt
         self._headless = resolved if resolved is not None else config.browser.headless
+        launch_args: list[str] = []
+        if not self._headless:
+            # Match a normal maximized desktop window (not phone chrome).
+            launch_args.append("--start-maximized")
         self._browser = self._playwright.chromium.launch(
             headless=self._headless,
             slow_mo=config.browser.slow_mo,
+            args=launch_args or None,
         )
         return self
 
@@ -49,6 +55,7 @@ class Browser:
         extra_headers: dict[str, str] | None = None,
         *,
         rotate_identity: bool = False,
+        mobile: bool = False,
     ) -> BrowserContext:
         if self._browser is None:
             raise RuntimeError("Browser not started. Call .start() first.")
@@ -69,12 +76,23 @@ class Browser:
             headers.setdefault("Accept-Language", identity["Accept-Language"])
             headers.setdefault("Accept", identity["Accept"])
 
-        self._context = self._browser.new_context(
-            viewport=viewport or MOBILE_VIEWPORT,
-            user_agent=ua or MOBILE_UA,
-            storage_state=state if state and Path(state).exists() else None,
-            extra_http_headers=headers or None,
-        )
+        ctx_kwargs: dict[str, Any] = {
+            "user_agent": ua or (MOBILE_UA if mobile else DESKTOP_UA),
+            "storage_state": state if state and Path(state).exists() else None,
+            "extra_http_headers": headers or None,
+        }
+        if viewport is not None:
+            ctx_kwargs["viewport"] = viewport
+        elif mobile:
+            ctx_kwargs["viewport"] = MOBILE_VIEWPORT
+        elif self._headless:
+            # Headless has no real window — pin a full-HD desktop size.
+            ctx_kwargs["viewport"] = DESKTOP_VIEWPORT
+        else:
+            # Headed: use the maximized OS window (fullscreen-class proportions).
+            ctx_kwargs["no_viewport"] = True
+
+        self._context = self._browser.new_context(**ctx_kwargs)
         return self._context
 
     def session_context(
@@ -83,9 +101,14 @@ class Browser:
         viewport: dict | None = None,
         user_agent: str | None = None,
         *,
-        rotate_identity: bool = True,
+        rotate_identity: bool = False,
+        mobile: bool = False,
     ) -> BrowserContext:
-        """Create a context with a saved session for the given account."""
+        """Create a context with a saved session for the given account.
+
+        Defaults to desktop identity. Pass ``mobile=True`` only when you
+        intentionally want phone layout.
+        """
         from src.core.session import SessionManager
 
         session = SessionManager(account_name)
@@ -95,6 +118,7 @@ class Browser:
             viewport=viewport,
             user_agent=user_agent,
             rotate_identity=rotate_identity,
+            mobile=mobile,
         )
 
     def page(self) -> Page:

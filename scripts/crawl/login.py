@@ -9,7 +9,7 @@ from pathlib import Path
 import click
 
 from src.core.accounts import default_account_name, get_account, load_accounts
-from src.core.browser import DESKTOP_UA, DESKTOP_VIEWPORT, Browser
+from src.core.browser import DESKTOP_UA, Browser
 from src.core.session import SessionManager, check_login_status, check_www_login_status
 
 
@@ -103,9 +103,7 @@ def login(account: str | None, headless: bool, force: bool, wait_seconds: int) -
         try:
             ctx = browser.session_context(
                 account_name,
-                viewport=DESKTOP_VIEWPORT,
                 user_agent=DESKTOP_UA,
-                rotate_identity=False,
             )
             page = ctx.new_page()
             creator_ok = check_login_status(page)
@@ -127,7 +125,7 @@ def login(account: str | None, headless: bool, force: bool, wait_seconds: int) -
         finally:
             browser.close()
 
-    click.echo("Opening Xiaohongshu login pages (desktop viewport)...")
+    click.echo("Opening Xiaohongshu login pages (desktop fullscreen)...")
     click.echo("1) Creator login  2) www search login (if QR wall appears)")
     browser = Browser()
     # Interactive scan/login needs a visible window unless --headless.
@@ -135,9 +133,7 @@ def login(account: str | None, headless: bool, force: bool, wait_seconds: int) -
     try:
         ctx = browser.session_context(
             account_name,
-            viewport=DESKTOP_VIEWPORT,
             user_agent=DESKTOP_UA,
-            rotate_identity=False,
         )
         page = ctx.new_page()
         creator_ok = session.has_session() and check_login_status(page)
@@ -191,9 +187,7 @@ def status(account: str | None, headless: bool) -> None:
     try:
         ctx = browser.session_context(
             account_name,
-            viewport=DESKTOP_VIEWPORT,
             user_agent=DESKTOP_UA,
-            rotate_identity=False,
         )
         page = ctx.new_page()
         creator_ok = check_login_status(page)
