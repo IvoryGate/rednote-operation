@@ -127,8 +127,9 @@ def _upload_images(page, draft_data: dict) -> None:
         image_paths = [_ensure_test_image()]
 
     click.echo(f"  Uploading {len(image_paths)} image(s)...")
-    file_chooser = page.wait_for_event("filechooser", timeout=10000)
-    page.evaluate("document.querySelector('input.upload-input').click()")
+    with page.expect_event("filechooser", timeout=10000) as fc_info:
+        page.locator("text=上传图片").first.click()
+    file_chooser = fc_info.value
     file_chooser.set_files(image_paths)
     click.echo("  Waiting for image upload to complete...")
     page.wait_for_timeout(5000)
