@@ -59,6 +59,8 @@ uv run python scripts/publish/manage_queue.py remove --id 1
 - 同一账号每天发布 ≤5篇
 - 图片需符合平台规范 (无二维码/水印/联系方式)
 - 默认账号名为 `main`（与 login session 名称一致）
+- 改版后先跑烟雾检查：`uv run python scripts/publish/smoke_selectors.py`（离线）或加 `--live`
+- 选择器配置：`config/publish_selectors.yaml`；失败证据：`data/screenshots/failures/`
 
 ## 参考知识库
 - knowledge/platform/01_content_rules.md
