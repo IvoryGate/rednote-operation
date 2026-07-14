@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 DEFAULT_SELECTORS_PATH = Path("config/publish_selectors.yaml")
 DEFAULT_EVIDENCE_DIR = Path("data/screenshots/failures")

@@ -10,6 +10,9 @@ repos:
     rev: v1.15.0
     hooks:
       - id: mypy
+        additional_dependencies:
+          - types-pyyaml==6.0.12.20260518
+          - types-python-dateutil==2.9.0.20260518
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.6.0

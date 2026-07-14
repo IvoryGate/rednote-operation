@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from src.core.accounts import (
     DEFAULT_ACCOUNT_NAME,
