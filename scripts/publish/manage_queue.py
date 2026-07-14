@@ -21,7 +21,7 @@ def list(status, limit):
     items = (
         db.query(PublishQueue)
         .filter(PublishQueue.status == status)
-        .order_by(PublishQueue.scheduled_for.asc())
+        .order_by(PublishQueue.scheduled_at.asc())
         .limit(limit)
         .all()
     )
@@ -32,7 +32,7 @@ def list(status, limit):
     click.echo(f"{'ID':>4} {'Title':<40} {'Scheduled':<20} {'Status':<12}")
     click.echo("-" * 80)
     for item in items:
-        sched = item.scheduled_for.strftime("%Y-%m-%d %H:%M") if item.scheduled_for else "N/A"
+        sched = item.scheduled_at.strftime("%Y-%m-%d %H:%M") if item.scheduled_at else "N/A"
         click.echo(f"{item.id:>4} {item.title or 'Untitled':<40} {sched:<20} {item.status:<12}")
     db.close()
 

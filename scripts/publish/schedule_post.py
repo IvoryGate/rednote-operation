@@ -31,7 +31,7 @@ def main(add, draft, publish_time, account, daemon, interval) -> None:
                 db.query(PublishQueue)
                 .filter(
                     PublishQueue.status == "pending",
-                    PublishQueue.scheduled_for <= now,
+                    PublishQueue.scheduled_at <= now,
                 )
                 .limit(5)
                 .all()
@@ -56,7 +56,7 @@ def main(add, draft, publish_time, account, daemon, interval) -> None:
                         item.status = "failed"
                         item.error_message = "Max retries reached"
                     else:
-                        item.scheduled_for = datetime.fromtimestamp(now.timestamp() + 300)
+                        item.scheduled_at = datetime.fromtimestamp(now.timestamp() + 300)
             if pending:
                 db.commit()
                 click.echo(f"Processed {len(pending)} items")
@@ -74,7 +74,7 @@ def main(add, draft, publish_time, account, daemon, interval) -> None:
             account_id=1,
             title=draft_data.get("title", ""),
             content=draft_data.get("content", ""),
-            scheduled_for=datetime.fromisoformat(publish_time),
+            scheduled_at=datetime.fromisoformat(publish_time),
             status="pending",
         )
         db.add(entry)
