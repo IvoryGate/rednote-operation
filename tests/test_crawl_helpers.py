@@ -187,6 +187,43 @@ def test_page_looks_rejected_detects_captcha() -> None:
     assert page_looks_rejected(page) is True
 
 
+def test_page_looks_rejected_ignores_captcha_in_js_bundle() -> None:
+    page = _FakePage(
+        "https://www.xiaohongshu.com/search_result?keyword=x",
+        "<html><script>var captchaSdk=1</script>正常内容</html>",
+    )
+    assert page_looks_rejected(page) is False
+
+
+def test_page_looks_rejected_false_when_cards_present() -> None:
+    class _PageWithCards(_FakePage):
+        def query_selector_all(self, _sel: str) -> list[object]:
+            return [object()]
+
+    page = _PageWithCards(
+        "https://www.xiaohongshu.com/search_result?keyword=x",
+        "<html>登录后查看搜索结果</html>",
+    )
+    assert page_looks_rejected(page) is False
+
+
+def test_page_looks_rejected_login_wall() -> None:
+    page = _FakePage(
+        "https://www.xiaohongshu.com/search_result?keyword=x",
+        "<html>登录后查看搜索结果</html>",
+    )
+    assert page_looks_rejected(page) is True
+
+
+def test_page_looks_rejected_ignores_generic_pin_fan() -> None:
+    # Lone "频繁" used to false-positive on unrelated copy / JS strings.
+    page = _FakePage(
+        "https://www.xiaohongshu.com/explore/x",
+        "<html>笔记很精彩，内容并不频繁出现</html>",
+    )
+    assert page_looks_rejected(page) is False
+
+
 def test_page_looks_rejected_clean_page() -> None:
     page = _FakePage("https://www.xiaohongshu.com/explore/x", "<html>正常笔记内容</html>")
     assert page_looks_rejected(page) is False

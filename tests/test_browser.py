@@ -35,14 +35,37 @@ def test_browser_context_creates_new_context(mock_playwright) -> None:
     mock_playwright.return_value.__enter__.return_value = mock_pw
     mock_pw.chromium.launch.return_value = mock_browser
 
-    from src.core.browser import Browser
+    from src.core.browser import DESKTOP_UA, DESKTOP_VIEWPORT, Browser
 
     browser = Browser()
-    browser.start()
+    browser.start(headless=True)
     ctx = browser.context()
 
     assert ctx is not None
     mock_browser.new_context.assert_called_once()
+    kwargs = mock_browser.new_context.call_args.kwargs
+    assert kwargs.get("viewport") == DESKTOP_VIEWPORT
+    assert kwargs.get("user_agent") == DESKTOP_UA
+    assert kwargs.get("no_viewport") is None
+
+
+def test_browser_headed_context_uses_no_viewport(mock_playwright) -> None:
+    mock_pw = MagicMock()
+    mock_browser = MagicMock()
+    mock_playwright.return_value.__enter__.return_value = mock_pw
+    mock_pw.chromium.launch.return_value = mock_browser
+
+    from src.core.browser import Browser
+
+    browser = Browser()
+    browser.start(headless=False)
+    browser.context()
+
+    kwargs = mock_browser.new_context.call_args.kwargs
+    assert kwargs.get("no_viewport") is True
+    assert "viewport" not in kwargs or kwargs.get("viewport") is None
+    launch_kwargs = mock_pw.chromium.launch.call_args.kwargs
+    assert "--start-maximized" in (launch_kwargs.get("args") or [])
 
 
 def test_browser_context_requires_start() -> None:

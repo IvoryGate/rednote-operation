@@ -6,7 +6,8 @@ import itertools
 import random
 from collections.abc import Iterator
 
-# Realistic desktop/mobile Chrome UAs — rotated per browser context.
+# Desktop-only UAs. Mobile UAs make Xiaohongshu serve phone UI / QR walls and
+# look unlike a normal creator workflow — keep them out of the default pool.
 USER_AGENT_POOL: tuple[str, ...] = (
     (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -27,16 +28,6 @@ USER_AGENT_POOL: tuple[str, ...] = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/122.0.0.0 Safari/537.36"
-    ),
-    (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        "Version/17.0 Mobile/15E148 Safari/604.1"
-    ),
-    (
-        "Mozilla/5.0 (Linux; Android 13; Pixel 7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Mobile Safari/537.36"
     ),
 )
 

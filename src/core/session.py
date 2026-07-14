@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlparse
 
 from src.core.config import config
 
@@ -45,6 +46,12 @@ _LOGGED_IN_MARKERS = (
     "创作灵感",
 )
 
+_WWW_LOGIN_WALL_MARKERS = (
+    "登录后查看搜索结果",
+    "登录后查看",
+    "可用 小红书 或 微信 扫码",
+)
+
 
 def check_login_status(page: Any) -> bool:
     """Return True when the Playwright page has an active creator session.
@@ -69,5 +76,34 @@ def check_login_status(page: Any) -> bool:
 
         # Creator host without login redirect is a weak positive signal.
         return "creator.xiaohongshu.com" in url and "login" not in url
+    except Exception:
+        return False
+
+
+def check_www_login_status(page: Any, *, keyword: str = "美食") -> bool:
+    """Return True when www search is usable (no QR / login wall).
+
+    Creator cookies alone often do not unlock ``www.xiaohongshu.com`` search —
+    consumers need a separate web login in the same storage_state.
+    """
+    try:
+        page.goto(
+            f"https://www.xiaohongshu.com/search_result?keyword={quote(keyword)}&sort=general",
+            wait_until="domcontentloaded",
+            timeout=config.browser.timeout,
+        )
+        page.wait_for_timeout(2500)
+        url = (page.url or "").lower()
+        if "login" in urlparse(url).path or "captcha" in url:
+            return False
+
+        html = page.content()
+        if any(marker in html for marker in _WWW_LOGIN_WALL_MARKERS):
+            return False
+
+        cards = page.query_selector_all(
+            "section.note-item, section.reds-note-card, .note-item, [class*=note-item]"
+        )
+        return len(cards) > 0
     except Exception:
         return False

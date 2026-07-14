@@ -44,9 +44,15 @@ uv run python scripts/crawl/login.py list
 
 需要图形界面（本机显示器；无头环境无法完成扫码/验证）。
 
+浏览器默认是**桌面全屏比例**（headed 最大化窗口；headless 1920×1080），不再默认手机版。
+
+关于「能不能别登录」：www 搜索页目前会弹出「登录后查看搜索结果」，不登录就拿不到卡片——这是平台墙，不是脚本强制。创作者发布也要 creator 登录。介意封号就用小号、低频率（见 `config.yaml` 的 `crawl.*` 间隔），不要短时间猛刷。
+
 ```bash
 uv run python scripts/crawl/login.py login --account main
-# 浏览器打开创作者登录页 → 手动登录成功 → 回终端按 Enter
+# 浏览器会依次检查：
+# 1) 创作者中心 — 未登录则扫码/登录，脚本自动轮询最多 180s
+# 2) www 搜索 — 若出现「登录后查看搜索结果」再扫一次（创作者 cookie 通常不够用）
 ```
 
 校验：
@@ -55,9 +61,11 @@ uv run python scripts/crawl/login.py login --account main
 uv run python scripts/crawl/login.py status --account main
 ```
 
-应看到 `Logged in: 'main'`。过期则：
+应看到 `Logged in: 'main' (creator + www)`。只有 creator、www 仍锁时提示 `Partial login`，再跑一遍 login 即可：
 
 ```bash
+uv run python scripts/crawl/login.py login --account main
+# 或强制重登：
 uv run python scripts/crawl/login.py login --account main --force
 ```
 

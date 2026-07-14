@@ -14,13 +14,18 @@ NOTE_ID_PATTERNS = (
     re.compile(r"[?&]note[_-]?id=([a-fA-F0-9]{16,})", re.IGNORECASE),
 )
 
+# Body-copy markers only. Do NOT include bare "captcha" — XHS JS bundles
+# contain that string on healthy pages and false-positive the probe.
 REJECT_MARKERS = (
     "访问频次异常",
-    "频繁",
-    "验证码",
-    "captcha",
+    "访问过于频繁",
+    "操作过于频繁",
+    "请完成验证码",
+    "请完成安全验证",
     "403 Forbidden",
     "请登录后查看",
+    "登录后查看搜索结果",
+    "登录后查看",
     "当前笔记暂时无法浏览",
 )
 
@@ -342,13 +347,26 @@ def extract_note_detail(page: Any) -> dict[str, Any]:
 
 
 def page_looks_rejected(page: Any) -> bool:
-    """Heuristic: captcha / rate-limit / forced-login interstitial."""
+    """Heuristic: captcha / rate-limit / forced-login interstitial.
+
+    Prefers URL + visible login-wall copy over generic HTML substring matches.
+    If note cards are already on the page, treat as not rejected.
+    """
     try:
         url = (page.url or "").lower()
-        if "captcha" in url or "login" in urlparse(url).path:
-            # login redirect after an authenticated session is suspicious for crawl pages
-            if "login" in url and "xiaohongshu.com" in url:
-                return True
+        path = urlparse(url).path
+        if "captcha" in url or (path.rstrip("/").endswith("/login") and "xiaohongshu.com" in url):
+            return True
+
+        try:
+            cards = page.query_selector_all(
+                "section.note-item, section.reds-note-card, .note-item, [class*=note-item]"
+            )
+            if cards:
+                return False
+        except Exception:
+            pass
+
         body = page.content()
         lowered = body.lower()
         for marker in REJECT_MARKERS:
