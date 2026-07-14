@@ -33,6 +33,12 @@ const router = createRouter({
       component: () => import('../views/Analysis.vue'),
       meta: { title: '数据分析' },
     },
+    {
+      path: '/workflows',
+      name: 'workflows',
+      component: () => import('../views/Workflows.vue'),
+      meta: { title: '工作流' },
+    },
   ],
 })
 

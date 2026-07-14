@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 
 from src.core.db import SessionLocal, init_db
+from src.core.workflows import runner
 from src.models import Competitor, Keyword, Note, PublishQueue
 
 app = FastAPI(title="RedNote Operation", version="0.1.0")
@@ -19,6 +22,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class WorkflowRunRequest(BaseModel):
+    params: dict[str, Any] = Field(default_factory=dict)
+    background: bool = True
 
 
 @app.get("/api/dashboard/stats")
@@ -151,6 +159,36 @@ async def list_keywords(top: int = Query(50)) -> list:
         ]
     finally:
         db.close()
+
+
+@app.get("/api/workflows")
+async def list_workflows() -> list:
+    return runner.list_workflows()
+
+
+@app.post("/api/workflows/{name}/run")
+async def run_workflow(name: str, body: WorkflowRunRequest | None = None) -> dict:
+    request = body or WorkflowRunRequest()
+    try:
+        job = runner.submit(name, request.params, background=request.background)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return job.to_dict()
+
+
+@app.get("/api/workflows/jobs")
+async def list_workflow_jobs(limit: int = Query(50, ge=1, le=200)) -> list:
+    return [job.to_dict() for job in runner.list_jobs(limit=limit)]
+
+
+@app.get("/api/workflows/jobs/{job_id}")
+async def get_workflow_job(job_id: str) -> dict:
+    job = runner.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+    return job.to_dict()
 
 
 # Mount static frontend AFTER API routes so "/" does not shadow /api/*.

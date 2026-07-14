@@ -40,6 +40,7 @@ const menuOptions = [
   { label: '内容管理', key: 'content', icon: iconRender('📝') },
   { label: '发布管理', key: 'publish', icon: iconRender('🚀') },
   { label: '数据分析', key: 'analysis', icon: iconRender('📈') },
+  { label: '工作流', key: 'workflows', icon: iconRender('⚙️') },
 ]
 
 function handleMenuSelect(key: string) {
