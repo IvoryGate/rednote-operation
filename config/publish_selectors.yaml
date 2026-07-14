@@ -1,0 +1,75 @@
+# Xiaohongshu creator publish-page DOM selectors
+# Edit this file when the platform UI changes — prefer not hardcoding in scripts.
+#
+# Strategy types:
+#   text        — Playwright text= locator / get_by_text
+#   css         — CSS selector
+#   role        — get_by_role(role, name=…)
+#   placeholder — get_by_placeholder
+#
+# Strategies are tried in order; first visible (or attached) match wins.
+
+version: 1
+last_verified: "2026-07-14"
+notes: >
+  Publish form is a QianKun micro-app. Title/content appear only after images
+  are uploaded. Prefer Chinese visible labels over hashed class names.
+
+controls:
+  publish_trigger:
+    description: Entry button that opens the note publish flow
+    strategies:
+      - { type: text, value: "发布笔记" }
+      - { type: role, role: button, name: "发布笔记" }
+      - { type: css, value: "button:has-text('发布笔记')" }
+
+  text_photo_tab:
+    description: Switch to image+text upload tab
+    strategies:
+      - { type: text, value: "上传图文" }
+      - { type: css, value: "span.title:has-text('上传图文')" }
+      - { type: css, value: "div:has-text('上传图文')" }
+
+  upload_images:
+    description: Visible control that opens the file chooser
+    strategies:
+      - { type: text, value: "上传图片" }
+      - { type: role, role: button, name: "上传图片" }
+      - { type: css, value: "button:has-text('上传图片')" }
+
+  image_input:
+    description: Hidden file input fallback
+    strategies:
+      - { type: css, value: "input.upload-input" }
+      - { type: css, value: "input[type=file]" }
+
+  title:
+    description: Note title input
+    strategies:
+      - { type: placeholder, value: "标题" }
+      - { type: css, value: "input[placeholder*='标题']" }
+      - { type: css, value: "#title" }
+      - { type: css, value: "[class*=title] input" }
+      - { type: role, role: textbox, name: "标题" }
+
+  content:
+    description: Note body editor (contenteditable / draft / quill)
+    strategies:
+      - { type: css, value: "[contenteditable='true']" }
+      - { type: css, value: "[contenteditable]" }
+      - { type: css, value: ".DraftEditor-editorContainer" }
+      - { type: css, value: "[class*=ql-editor]" }
+      - { type: role, role: textbox, name: "正文" }
+
+  publish_button:
+    description: Final submit button
+    strategies:
+      - { type: role, role: button, name: "发布" }
+      - { type: css, value: "button:has-text('发布')" }
+      - { type: text, value: "发布" }
+
+  publish_success:
+    description: Success toast / banner after publish
+    strategies:
+      - { type: text, value: "发布成功" }
+      - { type: css, value: "*:has-text('发布成功')" }

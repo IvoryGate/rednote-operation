@@ -9,23 +9,24 @@ import click
 
 from src.core.browser import DESKTOP_UA, DESKTOP_VIEWPORT, Browser
 from src.core.db import SessionLocal, init_db
+from src.core.publish_dom import (
+    SelectorRegistry,
+    SelectorResolutionError,
+    dump_failure_evidence,
+    resolve_locator,
+)
 from src.core.session import SessionManager
 from src.models import PublishQueue
 
-# ── DOM selectors for Xiaohongshu creator publish page ──────────────────
-# The publish form is loaded as a QianKun micro-app after clicking the
-# "发布笔记" button.  Run with --explore to dump the page HTML.
-# NOTE: title/content/tag fields appear ONLY after images are uploaded.
-
-SEL_PUBLISH_TRIGGER = "text=发布笔记"
-SEL_PUBLISH_TAB_TEXTPHOTO = "text=上传图文"
-SEL_PUBLISH_BTN = "button:has-text('发布')"
-SEL_IMAGE_INPUT = "input.upload-input, input[type=file]"
-SEL_TITLE = "input[placeholder*=标题], #title, [class*=title] input"
-SEL_CONTENT = "[contenteditable], .DraftEditor-editorContainer, [class*=ql-editor]"
-SEL_TAG_INPUT = 'input[placeholder*=标签], input[placeholder*="#"], [class*=tag] input'
-
 SCREENSHOT_DIR = Path("./data/screenshots")
+_REGISTRY: SelectorRegistry | None = None
+
+
+def _registry() -> SelectorRegistry:
+    global _REGISTRY
+    if _REGISTRY is None:
+        _REGISTRY = SelectorRegistry.load()
+    return _REGISTRY
 
 
 def _ensure_test_image() -> str:
@@ -34,7 +35,6 @@ def _ensure_test_image() -> str:
     if path.exists():
         return str(path)
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-    # Minimal 1x1 red PNG
     import struct
     import zlib
 
@@ -67,27 +67,29 @@ def _ensure_test_image() -> str:
 
 def _open_publish_form(page) -> None:
     """Navigate to creator platform and open the publish form."""
+    registry = _registry()
     page.goto("https://creator.xiaohongshu.com/publish", wait_until="domcontentloaded")
     page.wait_for_timeout(3000)
 
     click.echo("  Clicking '发布笔记' to open publish form...")
-    trigger = page.locator(SEL_PUBLISH_TRIGGER).first
-    trigger.wait_for(state="visible", timeout=15000)
+    trigger = resolve_locator(page, registry, "publish_trigger", timeout_ms=15000)
     trigger.click()
-
     page.wait_for_timeout(2000)
 
     click.echo("  Selecting '上传图文' tab...")
     try:
-        tab = page.locator(SEL_PUBLISH_TAB_TEXTPHOTO).first
-        tab.wait_for(state="attached", timeout=10000)
-        page.evaluate("(el) => el.click()", tab.element_handle())
-    except Exception:
+        tab = resolve_locator(page, registry, "text_photo_tab", timeout_ms=10000, state="attached")
+        try:
+            page.evaluate("(el) => el.click()", tab.element_handle())
+        except Exception:
+            tab.click(force=True)
+    except SelectorResolutionError as exc:
+        click.echo(f"  Tab resolve failed ({exc}); trying JS text scan fallback...")
         page.evaluate(
             """() => {
-            const spans = document.querySelectorAll('span.title');
+            const spans = document.querySelectorAll('span.title, span, div');
             for (const s of spans) {
-                if (s.textContent.includes('上传图文')) {
+                if ((s.textContent || '').includes('上传图文')) {
                     s.click();
                     break;
                 }
@@ -101,6 +103,7 @@ def _open_publish_form(page) -> None:
 
 def _upload_images(page, draft_data: dict) -> None:
     """Upload images for the post. Creates a test image if none provided."""
+    registry = _registry()
     images = draft_data.get("images", [])
     if not images:
         click.echo("  No images in draft — using test image for form testing.")
@@ -127,10 +130,20 @@ def _upload_images(page, draft_data: dict) -> None:
         image_paths = [_ensure_test_image()]
 
     click.echo(f"  Uploading {len(image_paths)} image(s)...")
-    with page.expect_event("filechooser", timeout=10000) as fc_info:
-        page.locator("text=上传图片").first.click()
-    file_chooser = fc_info.value
-    file_chooser.set_files(image_paths)
+    try:
+        with page.expect_event("filechooser", timeout=10000) as fc_info:
+            upload_btn = resolve_locator(page, registry, "upload_images", timeout_ms=8000)
+            upload_btn.click()
+        file_chooser = fc_info.value
+        file_chooser.set_files(image_paths)
+    except Exception:
+        # Fallback: set files directly on <input type=file>
+        click.echo("  Filechooser click failed — trying direct input.upload...")
+        file_input = resolve_locator(
+            page, registry, "image_input", timeout_ms=5000, state="attached"
+        )
+        file_input.set_input_files(image_paths)
+
     click.echo("  Waiting for image upload to complete...")
     page.wait_for_timeout(5000)
     click.echo("  Images uploaded.")
@@ -138,16 +151,17 @@ def _upload_images(page, draft_data: dict) -> None:
 
 def _fill_form(page, draft_data: dict) -> None:
     """Fill title and content (tags are inline #hashtags in content)."""
+    registry = _registry()
     title = draft_data.get("title", "")
     content = draft_data.get("content", "")
 
     if title:
         click.echo(f"  Filling title: {title[:50]}...")
         try:
-            el = page.wait_for_selector(SEL_TITLE, timeout=15000)
+            el = resolve_locator(page, registry, "title", timeout_ms=15000)
             el.click()
             el.fill(title)
-        except Exception as e:
+        except SelectorResolutionError as e:
             click.echo(f"  Warning: title input not found ({e})")
     else:
         click.echo("  No title provided.")
@@ -155,10 +169,10 @@ def _fill_form(page, draft_data: dict) -> None:
     if content:
         click.echo(f"  Filling content ({len(content)} chars)...")
         try:
-            el = page.wait_for_selector(SEL_CONTENT, timeout=8000)
+            el = resolve_locator(page, registry, "content", timeout_ms=8000)
             el.click()
             page.keyboard.insert_text(content)
-        except Exception as e:
+        except SelectorResolutionError as e:
             click.echo(f"  Warning: content editor not found ({e})")
     else:
         click.echo("  No content provided.")
@@ -183,6 +197,7 @@ def _publish_via_browser(
         return False
 
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+    registry = _registry()
 
     browser = Browser()
     browser.start(headless=headless)
@@ -193,27 +208,36 @@ def _publish_via_browser(
     )
     page = ctx.new_page()
 
-    _open_publish_form(page)
-    _upload_images(page, draft_data)
-    _fill_form(page, draft_data)
+    try:
+        _open_publish_form(page)
+        _upload_images(page, draft_data)
+        _fill_form(page, draft_data)
 
-    if dry_run:
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        screenshot_path = SCREENSHOT_DIR / f"dry_run_{timestamp}.png"
-        page.screenshot(path=str(screenshot_path), full_page=True)
-        click.echo(f"[DRY-RUN] Skipped publish. Screenshot: {screenshot_path}")
-    else:
-        click.echo("  Clicking publish button...")
-        try:
-            page.click(SEL_PUBLISH_BTN)
-            page.wait_for_selector("text=发布成功", timeout=30000)
-            click.echo("Published!")
-        except Exception as e:
-            click.echo(f"  Publish failed: {e}")
-            browser.close()
-            return False
+        if dry_run:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_path = SCREENSHOT_DIR / f"dry_run_{timestamp}.png"
+            page.screenshot(path=str(screenshot_path), full_page=True)
+            click.echo(f"[DRY-RUN] Skipped publish. Screenshot: {screenshot_path}")
+        else:
+            click.echo("  Clicking publish button...")
+            try:
+                btn = resolve_locator(page, registry, "publish_button", timeout_ms=10000)
+                btn.click()
+                resolve_locator(page, registry, "publish_success", timeout_ms=30000)
+                click.echo("Published!")
+            except SelectorResolutionError as e:
+                click.echo(f"  Publish failed: {e}")
+                return False
+    except SelectorResolutionError as e:
+        click.echo(f"  Selector failure: {e}")
+        return False
+    except Exception as e:
+        evidence = dump_failure_evidence(page, control="unexpected", tried=[str(e)])
+        click.echo(f"  Unexpected publish error: {e} (evidence: {evidence})")
+        return False
+    finally:
+        browser.close()
 
-    browser.close()
     return True
 
 
@@ -224,6 +248,12 @@ def _explore_page(account: str = "main") -> None:
         click.echo(f"No session for '{account}'. Run login.py first.")
         return
 
+    registry = _registry()
+    click.echo(
+        f"Selector registry v{registry.version} "
+        f"(last_verified={registry.last_verified}) from {registry.source_path}"
+    )
+
     browser = Browser()
     browser.start(headless=False)
     ctx = browser.session_context(
@@ -233,7 +263,12 @@ def _explore_page(account: str = "main") -> None:
     )
     page = ctx.new_page()
 
-    _open_publish_form(page)
+    try:
+        _open_publish_form(page)
+    except SelectorResolutionError as e:
+        click.echo(f"Form open failed: {e}")
+        browser.close()
+        return
 
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -245,19 +280,13 @@ def _explore_page(account: str = "main") -> None:
     page.screenshot(path=str(SCREENSHOT_DIR / "publish_form.png"), full_page=True)
     click.echo(f"Screenshot saved to: {SCREENSHOT_DIR / 'publish_form.png'}")
 
-    for name, sel in [
-        ("publish trigger", SEL_PUBLISH_TRIGGER),
-        ("image input", SEL_IMAGE_INPUT),
-        ("title", SEL_TITLE),
-        ("content", SEL_CONTENT),
-        ("tag input", SEL_TAG_INPUT),
-        ("publish btn", SEL_PUBLISH_BTN),
-    ]:
-        els = page.query_selector_all(sel)
-        click.echo(f"  {name}: {len(els)} match(es)")
-        for el in els[:3]:
-            info = el.evaluate("el => el.tagName + (el.className ? '.' + el.className : '')")
-            click.echo(f"    -> <{info}> visible={el.is_visible()}")
+    for name in registry.controls:
+        try:
+            loc = resolve_locator(page, registry, name, timeout_ms=2000, state="attached")
+            count = loc.count() if hasattr(loc, "count") else 1
+            click.echo(f"  {name}: resolved (sample count~{count})")
+        except SelectorResolutionError as exc:
+            click.echo(f"  {name}: UNRESOLVED — {exc}")
 
     all_els = page.query_selector_all("button, input, [contenteditable], [role=textbox]")
     click.echo(f"\n  All interactive ({len(all_els)}):")
