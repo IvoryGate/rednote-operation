@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.core.db import Base, init_db
+from src.core.db import init_db
 from src.models import Competitor, Keyword, Note, PublishQueue
 
 
@@ -17,16 +17,16 @@ from src.models import Competitor, Keyword, Note, PublishQueue
 def client(tmp_path: Path, monkeypatch) -> TestClient:  # type: ignore[no-untyped-def]
     db_file = tmp_path / "api.db"
     engine = create_engine(f"sqlite:///{db_file}")
-    Session = sessionmaker(bind=engine)
+    session_factory = sessionmaker(bind=engine)
 
     monkeypatch.setattr("src.core.db.engine", engine)
-    monkeypatch.setattr("src.core.db.SessionLocal", Session)
-    monkeypatch.setattr("main.SessionLocal", Session)
+    monkeypatch.setattr("src.core.db.SessionLocal", session_factory)
+    monkeypatch.setattr("main.SessionLocal", session_factory)
 
     init_db()
 
     # Seed minimal data
-    db = Session()
+    db = session_factory()
     try:
         db.add(
             Note(

@@ -9,8 +9,8 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 
-from src.core.db import Base, init_db
 import src.models  # noqa: F401  # register tables
+from src.core.db import Base, init_db
 
 SCHEMA_PATH = Path("database/schema.sql")
 
