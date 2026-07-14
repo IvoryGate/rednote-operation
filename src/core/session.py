@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from src.core.config import config
 
@@ -36,7 +37,37 @@ class SessionManager:
         return str(self.state_dir)
 
 
-def check_login_status(page: object) -> bool:
-    """Check if currently logged in by visiting the creator page."""
-    # TODO: implement actual login status check
-    return False
+_LOGGED_IN_MARKERS = (
+    "创作者中心",
+    "发布笔记",
+    "数据概览",
+    "内容管理",
+    "创作灵感",
+)
+
+
+def check_login_status(page: Any) -> bool:
+    """Return True when the Playwright page has an active creator session.
+
+    Navigates to the creator home. A redirect to ``/login`` (or captcha) means
+    logged out; presence of creator-console markers means logged in.
+    """
+    try:
+        page.goto(
+            "https://creator.xiaohongshu.com/new/home",
+            wait_until="domcontentloaded",
+            timeout=config.browser.timeout,
+        )
+        page.wait_for_timeout(1500)
+        url = (page.url or "").lower()
+        if "login" in url or "captcha" in url:
+            return False
+
+        html = page.content()
+        if any(marker in html for marker in _LOGGED_IN_MARKERS):
+            return True
+
+        # Creator host without login redirect is a weak positive signal.
+        return "creator.xiaohongshu.com" in url and "login" not in url
+    except Exception:
+        return False
