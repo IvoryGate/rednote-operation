@@ -10,10 +10,10 @@ uv sync
 uv run playwright install chromium
 
 # Create data directories
-mkdir -p data logs exports .browser-data
+mkdir -p data logs exports .browser-data database
 
-# Initialize database (imports ORM models before create_all)
-uv run python -c "from src.core.db import init_db; init_db()"
+# Apply database migrations (ORM-aligned schema)
+uv run alembic upgrade head
 
 echo ""
 echo "Setup complete! Quick start:"
