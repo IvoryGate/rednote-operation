@@ -175,7 +175,10 @@ def _fill_form(page, draft_data: dict) -> None:
                 page.wait_for_timeout(300)
         except Exception as e:
             click.echo(f"  Warning: could not add tags ({e})")
-    else:
+            dump_path = SCREENSHOT_DIR / "debug_after_upload.html"
+            html = page.content()
+            dump_path.write_text(html)
+            click.echo(f"  Saved page HTML to {dump_path} for debugging")
         click.echo("  No tags provided.")
 
     click.echo("Form filled.")
