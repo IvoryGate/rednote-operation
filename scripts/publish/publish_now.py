@@ -137,10 +137,9 @@ def _upload_images(page, draft_data: dict) -> None:
 
 
 def _fill_form(page, draft_data: dict) -> None:
-    """Fill title, content, and tags (appear after image upload)."""
+    """Fill title and content (tags are inline #hashtags in content)."""
     title = draft_data.get("title", "")
     content = draft_data.get("content", "")
-    tags = draft_data.get("tags", [])
 
     if title:
         click.echo(f"  Filling title: {title[:50]}...")
@@ -163,23 +162,6 @@ def _fill_form(page, draft_data: dict) -> None:
             click.echo(f"  Warning: content editor not found ({e})")
     else:
         click.echo("  No content provided.")
-
-    if tags:
-        click.echo(f"  Adding {len(tags)} tag(s): {', '.join(tags)}")
-        try:
-            el = page.wait_for_selector(SEL_TAG_INPUT, timeout=8000)
-            for tag in tags:
-                el.click()
-                el.fill(tag)
-                page.keyboard.press("Enter")
-                page.wait_for_timeout(300)
-        except Exception as e:
-            click.echo(f"  Warning: could not add tags ({e})")
-            dump_path = SCREENSHOT_DIR / "debug_after_upload.html"
-            html = page.content()
-            dump_path.write_text(html)
-            click.echo(f"  Saved page HTML to {dump_path} for debugging")
-        click.echo("  No tags provided.")
 
     click.echo("Form filled.")
 
