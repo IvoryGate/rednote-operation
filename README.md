@@ -25,6 +25,14 @@ uv run python main.py       # Start the API server
 uv run python scripts/crawl/login.py --help   # CLI scripts work without PYTHONPATH
 ```
 
+**First time on a machine (account + login + live probes):** see [docs/first_run.md](docs/first_run.md).
+
+```bash
+cp config/accounts.yaml.template config/accounts.yaml   # then edit
+uv run python scripts/ops/preflight.py                  # offline checks
+uv run python scripts/crawl/login.py login --account main
+```
+
 ### Existing database (created before Alembic)
 
 If `database/rednote.db` already exists from `create_all` / older setup:

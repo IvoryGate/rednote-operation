@@ -20,7 +20,9 @@ def list_accounts() -> None:
     """List accounts from config/accounts.yaml."""
     accounts = load_accounts()
     if not accounts:
-        click.echo("No accounts.yaml found. Copy config/accounts.yaml.template first.")
+        click.echo("No accounts.yaml found.")
+        click.echo("  cp config/accounts.yaml.template config/accounts.yaml")
+        click.echo("See docs/first_run.md for the full checklist.")
         return
     for account in accounts:
         flag = "on" if account.enabled else "off"
@@ -34,7 +36,10 @@ def _resolve_account(account: str | None) -> str:
 def _warn_if_unknown(account_name: str) -> None:
     if not Path("config/accounts.yaml").exists():
         click.echo(
-            f"Warning: config/accounts.yaml missing — using '{account_name}' for session path only."
+            f"Warning: config/accounts.yaml missing — "
+            f"using '{account_name}' for session path only.\n"
+            "  cp config/accounts.yaml.template config/accounts.yaml\n"
+            "  See docs/first_run.md"
         )
         return
     cfg = get_account(account_name)
