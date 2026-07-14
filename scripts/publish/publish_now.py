@@ -13,16 +13,17 @@ from src.core.session import SessionManager
 from src.models import PublishQueue
 
 # ── DOM selectors for Xiaohongshu creator publish page ──────────────────
-# These are based on the current creator.xiaohongshu.com/publish DOM.
-# If the page layout changes, update these constants.
-# Run with --explore to dump the page structure for debugging.
+# The publish form is loaded as a QianKun micro-app after clicking the
+# "发布笔记" button.  Run with --explore to dump the page HTML after
+# the form has loaded.
 
+SEL_PUBLISH_TRIGGER = "text=发布笔记"
+SEL_PUBLISH_BTN = "button:has-text('发布')"
 SEL_IMAGE_INPUT = "input[type=file]"
+SEL_UPLOAD_AREA = ".upload-container, [class*=upload], [class*=dropzone]"
 SEL_TITLE = "input[placeholder*=标题], #title, [class*=title] input"
 SEL_CONTENT = "[contenteditable], .DraftEditor-editorContainer, [class*=ql-editor]"
-SEL_TAG_INPUT = "input[placeholder*=标签], input[placeholder*=#], [class*=tag] input"
-SEL_PUBLISH_BTN = "button:has-text('发布')"
-SEL_UPLOAD_AREA = ".upload-container, [class*=upload], [class*=dropzone]"
+SEL_TAG_INPUT = 'input[placeholder*=标签], input[placeholder*="#"], [class*=tag] input'
 
 SCREENSHOT_DIR = Path("./data/screenshots")
 
@@ -47,7 +48,22 @@ def _ensure_images(images: list[str]) -> list[str]:
     return resolved
 
 
-def _fill_form(page, draft_data: dict, dry_run: bool) -> None:
+def _open_publish_form(page) -> None:
+    """Navigate to creator platform and open the publish form."""
+    page.goto("https://creator.xiaohongshu.com/publish")
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(2000)
+
+    click.echo("  Clicking '发布笔记' to open publish form...")
+    trigger = page.locator(SEL_PUBLISH_TRIGGER).first
+    trigger.wait_for(state="visible", timeout=15000)
+    trigger.click()
+
+    page.wait_for_timeout(3000)
+    click.echo("  Waiting for publish form to load...")
+
+
+def _fill_form(page, draft_data: dict, dry_run: bool) -> bool:
     """Fill the Xiaohongshu publish form with draft data."""
     title = draft_data.get("title", "")
     content = draft_data.get("content", "")
@@ -69,35 +85,45 @@ def _fill_form(page, draft_data: dict, dry_run: bool) -> None:
 
     # ── 2. Fill title ───────────────────────────────────────────────────
     if title:
-        click.echo(f"  Filling title: {title}")
-        title_el = page.wait_for_selector(SEL_TITLE, timeout=10000)
-        title_el.click()
-        title_el.fill(title)
+        click.echo(f"  Filling title: {title[:50]}...")
+        try:
+            title_el = page.wait_for_selector(SEL_TITLE, timeout=8000)
+            title_el.click()
+            title_el.fill(title)
+        except Exception as e:
+            click.echo(f"  Warning: could not fill title ({e})")
     else:
         click.echo("  No title provided.")
 
     # ── 3. Fill content ─────────────────────────────────────────────────
     if content:
         click.echo(f"  Filling content ({len(content)} chars)...")
-        content_el = page.wait_for_selector(SEL_CONTENT, timeout=10000)
-        content_el.click()
-        page.keyboard.insert_text(content)
+        try:
+            content_el = page.wait_for_selector(SEL_CONTENT, timeout=8000)
+            content_el.click()
+            page.keyboard.insert_text(content)
+        except Exception as e:
+            click.echo(f"  Warning: could not fill content ({e})")
     else:
         click.echo("  No content provided.")
 
     # ── 4. Add tags ─────────────────────────────────────────────────────
     if tags:
         click.echo(f"  Adding {len(tags)} tag(s): {', '.join(tags)}")
-        tag_el = page.wait_for_selector(SEL_TAG_INPUT, timeout=10000)
-        for tag in tags:
-            tag_el.click()
-            tag_el.fill(tag)
-            page.keyboard.press("Enter")
-            page.wait_for_timeout(300)
+        try:
+            tag_el = page.wait_for_selector(SEL_TAG_INPUT, timeout=8000)
+            for tag in tags:
+                tag_el.click()
+                tag_el.fill(tag)
+                page.keyboard.press("Enter")
+                page.wait_for_timeout(300)
+        except Exception as e:
+            click.echo(f"  Warning: could not add tags ({e})")
     else:
         click.echo("  No tags provided.")
 
     click.echo("Form filled successfully.")
+    return True
 
 
 def _publish_via_browser(
@@ -122,31 +148,29 @@ def _publish_via_browser(
         ctx = browser.session_context(account)
         page = ctx.new_page()
 
-        click.echo("Opening Xiaohongshu creator publish page...")
-        page.goto("https://creator.xiaohongshu.com/publish")
-
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
-
+        _open_publish_form(page)
         _fill_form(page, draft_data, dry_run)
 
         if dry_run:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             screenshot_path = SCREENSHOT_DIR / f"dry_run_{timestamp}.png"
             page.screenshot(path=str(screenshot_path), full_page=True)
-            click.echo(f"[DRY-RUN] Publish skipped. Screenshot saved: {screenshot_path}")
-            click.echo(f"[DRY-RUN] Would publish: {draft_data.get('title', 'Untitled')}")
+            click.echo(f"[DRY-RUN] Skipped publish. Screenshot: {screenshot_path}")
         else:
             click.echo("  Clicking publish button...")
-            page.click(SEL_PUBLISH_BTN)
-            page.wait_for_selector("text=发布成功", timeout=30000)
-            click.echo("Published successfully!")
+            try:
+                page.click(SEL_PUBLISH_BTN)
+                page.wait_for_selector("text=发布成功", timeout=30000)
+                click.echo("Published successfully!")
+            except Exception as e:
+                click.echo(f"  Publish failed: {e}")
+                return False
 
     return True
 
 
 def _explore_page(account: str = "main") -> None:
-    """Open the publish page and print the DOM structure for debugging."""
+    """Open the publish page, click the trigger, dump DOM for debugging."""
     session = SessionManager(account)
     if not session.has_session():
         click.echo(f"No session for '{account}'. Run login.py first.")
@@ -156,21 +180,20 @@ def _explore_page(account: str = "main") -> None:
         ctx = browser.session_context(account)
         page = ctx.new_page()
 
-        click.echo("Opening Xiaohongshu creator publish page...")
-        page.goto("https://creator.xiaohongshu.com/publish")
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(3000)
+        _open_publish_form(page)
+
+        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
         html = page.content()
-        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-        dump_path = SCREENSHOT_DIR / "page_dump.html"
+        dump_path = SCREENSHOT_DIR / "page_with_form.html"
         dump_path.write_text(html)
-        click.echo(f"Page HTML saved to: {dump_path}")
+        click.echo(f"Page HTML (form loaded) saved to: {dump_path}")
 
-        page.screenshot(path=str(SCREENSHOT_DIR / "page_screenshot.png"), full_page=True)
-        click.echo(f"Screenshot saved to: {SCREENSHOT_DIR / 'page_screenshot.png'}")
+        page.screenshot(path=str(SCREENSHOT_DIR / "publish_form.png"), full_page=True)
+        click.echo(f"Screenshot saved to: {SCREENSHOT_DIR / 'publish_form.png'}")
 
         for name, sel in [
+            ("publish trigger", SEL_PUBLISH_TRIGGER),
             ("image input", SEL_IMAGE_INPUT),
             ("title", SEL_TITLE),
             ("content", SEL_CONTENT),
@@ -184,6 +207,19 @@ def _explore_page(account: str = "main") -> None:
                 info = el.evaluate("el => el.tagName + (el.className ? '.' + el.className : '')")
                 visible = el.is_visible()
                 click.echo(f"    -> <{info}> visible={visible}")
+
+        # Also dump all buttons and inputs for discovery
+        all_buttons = page.query_selector_all("button, input, [contenteditable], [role=textbox]")
+        click.echo(f"\n  All interactive elements ({len(all_buttons)} found):")
+        for el in all_buttons[:30]:
+            tag = el.evaluate("el => el.tagName")
+            text = el.evaluate(
+                "el => (el.tagName==='BUTTON' ? el.textContent.trim() : '') "
+                "|| el.getAttribute('placeholder') || el.getAttribute('aria-label') || ''"
+            )
+            visible = el.is_visible()
+            if text or tag == "INPUT":
+                click.echo(f"    <{tag}> visible={visible} text='{text[:40]}'")
 
 
 @click.command()
@@ -199,7 +235,7 @@ def _explore_page(account: str = "main") -> None:
 @click.option(
     "--explore",
     is_flag=True,
-    help="Open publish page and dump DOM structure for debugging selectors",
+    help="Open publish form and dump DOM for debugging selectors",
 )
 def main(draft, queue_id, account, headless, dry_run, explore) -> None:
     """Publish a post to Xiaohongshu immediately.
