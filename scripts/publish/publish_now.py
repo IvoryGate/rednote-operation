@@ -198,34 +198,36 @@ def _publish_via_browser(
 
     SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
-    with Browser() as browser:
-        browser.start(headless=headless)
-        ctx = browser.session_context(
-            account,
-            viewport=DESKTOP_VIEWPORT,
-            user_agent=DESKTOP_UA,
-        )
-        page = ctx.new_page()
+    browser = Browser()
+    browser.start(headless=headless)
+    ctx = browser.session_context(
+        account,
+        viewport=DESKTOP_VIEWPORT,
+        user_agent=DESKTOP_UA,
+    )
+    page = ctx.new_page()
 
-        _open_publish_form(page)
-        _upload_images(page, draft_data)
-        _fill_form(page, draft_data)
+    _open_publish_form(page)
+    _upload_images(page, draft_data)
+    _fill_form(page, draft_data)
 
-        if dry_run:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            screenshot_path = SCREENSHOT_DIR / f"dry_run_{timestamp}.png"
-            page.screenshot(path=str(screenshot_path), full_page=True)
-            click.echo(f"[DRY-RUN] Skipped publish. Screenshot: {screenshot_path}")
-        else:
-            click.echo("  Clicking publish button...")
-            try:
-                page.click(SEL_PUBLISH_BTN)
-                page.wait_for_selector("text=发布成功", timeout=30000)
-                click.echo("Published!")
-            except Exception as e:
-                click.echo(f"  Publish failed: {e}")
-                return False
+    if dry_run:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        screenshot_path = SCREENSHOT_DIR / f"dry_run_{timestamp}.png"
+        page.screenshot(path=str(screenshot_path), full_page=True)
+        click.echo(f"[DRY-RUN] Skipped publish. Screenshot: {screenshot_path}")
+    else:
+        click.echo("  Clicking publish button...")
+        try:
+            page.click(SEL_PUBLISH_BTN)
+            page.wait_for_selector("text=发布成功", timeout=30000)
+            click.echo("Published!")
+        except Exception as e:
+            click.echo(f"  Publish failed: {e}")
+            browser.close()
+            return False
 
+    browser.close()
     return True
 
 
@@ -236,51 +238,53 @@ def _explore_page(account: str = "main") -> None:
         click.echo(f"No session for '{account}'. Run login.py first.")
         return
 
-    with Browser() as browser:
-        browser.start(headless=False)
-        ctx = browser.session_context(
-            account,
-            viewport=DESKTOP_VIEWPORT,
-            user_agent=DESKTOP_UA,
+    browser = Browser()
+    browser.start(headless=False)
+    ctx = browser.session_context(
+        account,
+        viewport=DESKTOP_VIEWPORT,
+        user_agent=DESKTOP_UA,
+    )
+    page = ctx.new_page()
+
+    _open_publish_form(page)
+
+    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+
+    html = page.content()
+    dump_path = SCREENSHOT_DIR / "page_with_form.html"
+    dump_path.write_text(html)
+    click.echo(f"Page HTML saved to: {dump_path}")
+
+    page.screenshot(path=str(SCREENSHOT_DIR / "publish_form.png"), full_page=True)
+    click.echo(f"Screenshot saved to: {SCREENSHOT_DIR / 'publish_form.png'}")
+
+    for name, sel in [
+        ("publish trigger", SEL_PUBLISH_TRIGGER),
+        ("image input", SEL_IMAGE_INPUT),
+        ("title", SEL_TITLE),
+        ("content", SEL_CONTENT),
+        ("tag input", SEL_TAG_INPUT),
+        ("publish btn", SEL_PUBLISH_BTN),
+    ]:
+        els = page.query_selector_all(sel)
+        click.echo(f"  {name}: {len(els)} match(es)")
+        for el in els[:3]:
+            info = el.evaluate("el => el.tagName + (el.className ? '.' + el.className : '')")
+            click.echo(f"    -> <{info}> visible={el.is_visible()}")
+
+    all_els = page.query_selector_all("button, input, [contenteditable], [role=textbox]")
+    click.echo(f"\n  All interactive ({len(all_els)}):")
+    for el in all_els[:30]:
+        tag = el.evaluate("el => el.tagName")
+        text = el.evaluate(
+            "el => (el.tagName==='BUTTON' ? el.textContent.trim() : '') "
+            "|| el.getAttribute('placeholder') || el.getAttribute('aria-label') || ''"
         )
-        page = ctx.new_page()
+        if text or tag == "INPUT":
+            click.echo(f"    <{tag}> visible={el.is_visible()} text='{text[:40]}'")
 
-        _open_publish_form(page)
-
-        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
-
-        html = page.content()
-        dump_path = SCREENSHOT_DIR / "page_with_form.html"
-        dump_path.write_text(html)
-        click.echo(f"Page HTML saved to: {dump_path}")
-
-        page.screenshot(path=str(SCREENSHOT_DIR / "publish_form.png"), full_page=True)
-        click.echo(f"Screenshot saved to: {SCREENSHOT_DIR / 'publish_form.png'}")
-
-        for name, sel in [
-            ("publish trigger", SEL_PUBLISH_TRIGGER),
-            ("image input", SEL_IMAGE_INPUT),
-            ("title", SEL_TITLE),
-            ("content", SEL_CONTENT),
-            ("tag input", SEL_TAG_INPUT),
-            ("publish btn", SEL_PUBLISH_BTN),
-        ]:
-            els = page.query_selector_all(sel)
-            click.echo(f"  {name}: {len(els)} match(es)")
-            for el in els[:3]:
-                info = el.evaluate("el => el.tagName + (el.className ? '.' + el.className : '')")
-                click.echo(f"    -> <{info}> visible={el.is_visible()}")
-
-        all_els = page.query_selector_all("button, input, [contenteditable], [role=textbox]")
-        click.echo(f"\n  All interactive ({len(all_els)}):")
-        for el in all_els[:30]:
-            tag = el.evaluate("el => el.tagName")
-            text = el.evaluate(
-                "el => (el.tagName==='BUTTON' ? el.textContent.trim() : '') "
-                "|| el.getAttribute('placeholder') || el.getAttribute('aria-label') || ''"
-            )
-            if text or tag == "INPUT":
-                click.echo(f"    <{tag}> visible={el.is_visible()} text='{text[:40]}'")
+    browser.close()
 
 
 @click.command()
