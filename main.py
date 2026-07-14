@@ -3,13 +3,18 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 
 from src.core.db import SessionLocal, init_db
+from src.core.workflow_auth import (
+    auth_required,
+    extract_token_from_headers,
+    verify_bearer_token,
+)
 from src.core.workflows import runner
 from src.models import Competitor, Keyword, Note, PublishQueue
 
@@ -167,7 +172,16 @@ async def list_workflows() -> list:
 
 
 @app.post("/api/workflows/{name}/run")
-async def run_workflow(name: str, body: WorkflowRunRequest | None = None) -> dict:
+async def run_workflow(
+    name: str,
+    body: WorkflowRunRequest | None = None,
+    authorization: str | None = Header(default=None),
+    x_api_token: str | None = Header(default=None, alias="X-API-Token"),
+) -> dict:
+    if auth_required():
+        token = extract_token_from_headers(authorization, x_api_token)
+        if not verify_bearer_token(token):
+            raise HTTPException(status_code=401, detail="Invalid or missing API token")
     request = body or WorkflowRunRequest()
     try:
         job = runner.submit(name, request.params, background=request.background)

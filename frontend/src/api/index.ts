@@ -1,7 +1,36 @@
 const BASE = '/api'
+const TOKEN_KEY = 'rednote_api_token'
+
+export function getApiToken(): string {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+export function setApiToken(token: string): void {
+  try {
+    if (token.trim()) localStorage.setItem(TOKEN_KEY, token.trim())
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // Ignore storage failures (private mode / SSR).
+  }
+}
+
+function authHeaders(includeJson = false): Record<string, string> {
+  const headers: Record<string, string> = {}
+  if (includeJson) headers['Content-Type'] = 'application/json'
+  const token = getApiToken()
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+    headers['X-API-Token'] = token
+  }
+  return headers
+}
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() })
   if (!res.ok) throw new Error(`API error: ${res.status}`)
   return res.json()
 }
@@ -9,7 +38,7 @@ async function get<T>(path: string): Promise<T> {
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(true),
     body: JSON.stringify(body ?? {}),
   })
   if (!res.ok) {

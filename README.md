@@ -43,6 +43,19 @@ uv run python scripts/publish/smoke_selectors.py           # offline YAML/regist
 uv run python scripts/publish/smoke_selectors.py --live    # needs login session
 ```
 
+### Workflow API auth
+
+`POST /api/workflows/{name}/run` accepts `Authorization: Bearer <token>` or `X-API-Token`.
+
+```bash
+# config/config.yaml → security.api_token, or:
+export REDNOTE_API_TOKEN=your-secret
+```
+
+When the effective token is non-empty (or `security.require_token: true`), the run endpoint
+requires it. Real `publish.now` (`dry_run=false`) also needs
+`confirm_publish: "I_CONFIRM_PUBLISH"`; otherwise the runner forces dry-run.
+
 ## Development
 
 ```bash
