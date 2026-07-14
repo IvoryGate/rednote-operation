@@ -2,16 +2,19 @@
 #
 # Copy this file to config/accounts.yaml and fill in your credentials.
 # accounts.yaml is in .gitignore and will NOT be committed.
+#
+# Account ``name`` must match the --account value used by crawl/publish
+# scripts (default: main).
 
 accounts:
-  - name: "main_account"
+  - name: "main"
     phone: "138xxxx1234"
-    cookies_path: "./.browser-data/main_account"
+    cookies_path: "./.browser-data/main"
     platform: "xiaohongshu"
     enabled: true
 
-  - name: "backup_account"
+  - name: "backup"
     phone: "139xxxx5678"
-    cookies_path: "./.browser-data/backup_account"
+    cookies_path: "./.browser-data/backup"
     platform: "xiaohongshu"
     enabled: false
