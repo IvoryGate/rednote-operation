@@ -4,9 +4,9 @@
 从竞品调研 → 内容创作 → 定时发布 → 数据复盘 的完整运营周期。
 
 ## 前置条件
-- 已完成项目初始化 (uv sync, playwright install)
+- 已完成项目初始化 (`./setup.sh` 或 `uv sync` + `playwright install chromium`)
 - 知识库已就绪 (knowledge/)
-- 账号已配置
+- 账号已配置 (`config/accounts.yaml`) 且已登录 (`scripts/crawl/login.py login --account main`)
 
 ## 完整工作流
 
