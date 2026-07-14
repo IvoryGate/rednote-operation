@@ -29,6 +29,23 @@ export interface QueueItem {
   scheduled_for: string
 }
 
+export interface NoteSummary {
+  id: number
+  title: string
+  like_count: number
+  collect_count: number
+  comment_count: number
+  share_count: number
+  published_at: string | null
+}
+
+export interface KeywordSummary {
+  keyword: string
+  search_volume: number
+  competition: number
+  category: string
+}
+
 export const api = {
   dashboard: {
     stats: () => get<DashboardStats>('/dashboard/stats'),
@@ -39,5 +56,13 @@ export const api = {
   queue: {
     list: (status = 'pending') =>
       get<QueueItem[]>(`/queue?status=${status}`),
+  },
+  notes: {
+    list: (limit = 50, offset = 0) =>
+      get<NoteSummary[]>(`/notes?limit=${limit}&offset=${offset}`),
+  },
+  keywords: {
+    list: (top = 50) =>
+      get<KeywordSummary[]>(`/keywords?top=${top}`),
   },
 }
