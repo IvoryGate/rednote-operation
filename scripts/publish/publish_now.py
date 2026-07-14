@@ -28,7 +28,6 @@ def _publish_via_browser(
         return False
 
     with Browser() as browser:
-        browser.start()
         ctx = browser.session_context(account)
         page = ctx.new_page()
 

@@ -14,8 +14,8 @@ class Browser:
         self._context: BrowserContext | None = None
 
     def start(self) -> Self:
-        self._playwright = sync_playwright().start()
-        assert self._playwright is not None
+        ctx_mgr = sync_playwright()
+        self._playwright = ctx_mgr.__enter__()
         self._browser = self._playwright.chromium.launch(
             headless=config.browser.headless,
             slow_mo=config.browser.slow_mo,

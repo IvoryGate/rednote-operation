@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -8,14 +9,37 @@ from src.core.db import SessionLocal, init_db
 from src.models import Note
 
 
-def extract_note_data(page: object) -> dict:
-    # TODO: extract note data from Xiaohongshu page
-    return {}
+def extract_note_data(page: Any) -> dict:
+    try:
+        title = page.query_selector("title")
+        content = page.query_selector("meta[name=description]")
+        return {
+            "title": title.inner_text() if title else "",
+            "content": content.get_attribute("content") if content else "",
+            "url": page.url,
+        }
+    except Exception:
+        return {}
 
 
-def extract_notes_from_list(page: object) -> list[dict]:
-    # TODO: extract note list from profile/search page
-    return []
+def extract_notes_from_list(page: Any) -> list[dict]:
+    results = []
+    try:
+        cards = page.query_selector_all("section.reds-note-card")
+        for card in cards:
+            title_el = card.query_selector(".note-title")
+            author_el = card.query_selector(".author")
+            img_el = card.query_selector("img")
+            results.append(
+                {
+                    "title": title_el.inner_text() if title_el else "",
+                    "author": author_el.inner_text() if author_el else "",
+                    "cover": img_el.get_attribute("src") if img_el else "",
+                }
+            )
+    except Exception:
+        pass
+    return results
 
 
 @click.command()
@@ -34,7 +58,6 @@ def main(  # type: ignore[no-untyped-def]
     results = []
 
     with Browser() as browser:
-        browser.start()
         ctx = browser.session_context(session_account)
         page = ctx.new_page()
 

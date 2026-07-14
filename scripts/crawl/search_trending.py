@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -8,9 +9,26 @@ from src.core.db import SessionLocal, init_db
 from src.models import Keyword
 
 
-def search_keyword(page: object, keyword: str, sort: str, count: int) -> list[dict]:
-    # TODO: navigate to search results, extract note data
-    return []
+def search_keyword(page: Any, keyword: str, sort: str, count: int) -> list[dict]:
+    results = []
+    try:
+        url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&sort={sort}"
+        page.goto(url)
+        page.wait_for_timeout(5000)
+        cards = page.query_selector_all("section.reds-note-card")
+        for card in cards[:count]:
+            title_el = card.query_selector(".note-title")
+            img_el = card.query_selector("img")
+            results.append(
+                {
+                    "keyword": keyword,
+                    "title": title_el.inner_text() if title_el else "",
+                    "cover": img_el.get_attribute("src") if img_el else "",
+                }
+            )
+    except Exception:
+        pass
+    return results
 
 
 @click.command()
@@ -64,7 +82,6 @@ def main(  # type: ignore[no-untyped-def]
 
     all_results = {}
     with Browser() as browser:
-        browser.start()
         ctx = browser.session_context(session_account)
         page = ctx.new_page()
         for kw in keywords:

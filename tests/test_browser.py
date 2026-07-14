@@ -14,7 +14,7 @@ def mock_playwright():
 def test_browser_start_close(mock_playwright) -> None:
     mock_pw = MagicMock()
     mock_browser = MagicMock()
-    mock_playwright.return_value.start.return_value = mock_pw
+    mock_playwright.return_value.__enter__.return_value = mock_pw
     mock_pw.chromium.launch.return_value = mock_browser
 
     from src.core.browser import Browser
@@ -32,7 +32,7 @@ def test_browser_start_close(mock_playwright) -> None:
 def test_browser_context_creates_new_context(mock_playwright) -> None:
     mock_pw = MagicMock()
     mock_browser = MagicMock()
-    mock_playwright.return_value.start.return_value = mock_pw
+    mock_playwright.return_value.__enter__.return_value = mock_pw
     mock_pw.chromium.launch.return_value = mock_browser
 
     from src.core.browser import Browser
@@ -56,7 +56,7 @@ def test_browser_context_requires_start() -> None:
 def test_browser_context_manager(mock_playwright) -> None:
     mock_pw = MagicMock()
     mock_browser = MagicMock()
-    mock_playwright.return_value.start.return_value = mock_pw
+    mock_playwright.return_value.__enter__.return_value = mock_pw
     mock_pw.chromium.launch.return_value = mock_browser
 
     from src.core.browser import Browser
@@ -71,7 +71,7 @@ def test_browser_context_manager(mock_playwright) -> None:
 def test_browser_context_with_storage_state(mock_playwright, tmp_path: Path) -> None:
     mock_pw = MagicMock()
     mock_browser = MagicMock()
-    mock_playwright.return_value.start.return_value = mock_pw
+    mock_playwright.return_value.__enter__.return_value = mock_pw
     mock_pw.chromium.launch.return_value = mock_browser
 
     from src.core.browser import Browser

@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -9,14 +10,34 @@ from src.core.db import SessionLocal, init_db
 from src.models import Competitor, Note
 
 
-def extract_metrics(page: object) -> dict:
-    # TODO: extract follower count, note count from profile page
-    return {"followers": 0, "notes_count": 0}
+def extract_metrics(page: Any) -> dict:
+    try:
+        follower_el = page.query_selector("[class*=follower]")
+        note_count_el = page.query_selector("[class*=note-count]")
+        return {
+            "followers": int(follower_el.inner_text()) if follower_el else 0,
+            "notes_count": int(note_count_el.inner_text()) if note_count_el else 0,
+        }
+    except Exception:
+        return {"followers": 0, "notes_count": 0}
 
 
-def extract_notes(page: object) -> list[dict]:
-    # TODO: extract note list items from profile page
-    return []
+def extract_notes(page: Any) -> list[dict]:
+    results = []
+    try:
+        cards = page.query_selector_all("section.reds-note-card")
+        for card in cards:
+            title_el = card.query_selector(".note-title")
+            like_el = card.query_selector("[class*=like]")
+            results.append(
+                {
+                    "title": title_el.inner_text() if title_el else "",
+                    "like_count": int(like_el.inner_text()) if like_el else 0,
+                }
+            )
+    except Exception:
+        pass
+    return results
 
 
 @click.command()
@@ -67,7 +88,6 @@ def main(  # type: ignore[no-untyped-def]
             or f"https://www.xiaohongshu.com/user/profile/{competitor.competitor_name}"
         )
         with Browser() as browser:
-            browser.start()
             ctx = browser.session_context(session_account)
             page = ctx.new_page()
             page.goto(url)

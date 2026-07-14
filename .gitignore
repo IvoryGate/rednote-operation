@@ -44,3 +44,10 @@ Thumbs.db
 *.log
 logs/
 frontend/package-lock.json
+
+# Runtime data
+data/
+.browser-data/
+
+# Scripts
+.virtual_documents/
