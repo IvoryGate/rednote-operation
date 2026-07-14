@@ -33,7 +33,7 @@ uv run python scripts/create/generate_post.py \
 
 ### Step 3: AI 生成终稿
 使用 LLM（Cursor/Codex 自身能力）阅读 brief + knowledge/prompts/copywriting_prompts.md，
-填写 brief 中的 `generated.title` / `generated.body` / `generated.tags`，保存为定稿 JSON。
+填写 brief 中的 `generated.title` / `generated.body` / `generated.tags`，保存回同一 JSON。
 
 ### Step 4: 生成配图方案
 ```bash
@@ -44,22 +44,47 @@ uv run python scripts/create/generate_image.py \
 
 无 brief 时可直接：`--topic "..." --category food`。
 
-### Step 5: 加入发布日程
-将定稿加入 `publish_queue`（无独立 `calendar_add.py`）：
+### Step 5: 定稿校验并产出可发布草稿
+将 AI 填写后的 brief 规范化为 `publish_now` / `schedule_post` 可用结构，并跑质量门槛：
+
+```bash
+uv run python scripts/create/finalize_post.py \
+  --brief data/drafts/2024-01-01-brief.json \
+  --images-json data/drafts/2024-01-01-images.json \
+  --image data/media/1.jpg --image data/media/2.jpg --image data/media/3.jpg \
+  --output data/drafts/2024-01-01-final.json \
+  --require-images
+```
+
+直接入队：
+
+```bash
+uv run python scripts/create/finalize_post.py \
+  --brief data/drafts/2024-01-01-brief.json \
+  --output data/drafts/2024-01-01-final.json \
+  --queue --time "2024-01-05 10:00"
+```
+
+质量不达标时默认失败；调试可用 `--no-strict`。
+
+### Step 6: 加入发布日程（可选）
+也可对定稿或 brief 直接：
 
 ```bash
 uv run python scripts/publish/schedule_post.py \
   --add \
-  --draft data/drafts/2024-01-01-brief.json \
+  --draft data/drafts/2024-01-01-final.json \
   --time "2024-01-05 10:00" \
   --account main
 ```
 
+`schedule_post` 已兼容 brief（读 `generated.*`）与 final（读 `title`/`content`）。
+
 ## 质量标准
 - 标题 ≤20字, 含关键词
 - 正文 200-800字, 段落间有空行
-- 图片 3-9张, 首图最重要
-- 标签 5-10个, 覆盖大词+精准词+长尾词
+- 图片 3-9张, 首图最重要（`--require-images` 时强制校验）
+- 标签 5-10个, 覆盖大词+精准词+长尾词（定稿时自动追加为正文末尾 `#话题`）
 
 ## 参考知识库
 - knowledge/templates/post_templates/
