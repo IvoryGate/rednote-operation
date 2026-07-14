@@ -16,6 +16,14 @@ browser:
   user_data_dir: "./.browser-data"
   timeout: 30000
 
+# Crawl anti-bot pacing (no IP/proxy pool). Scripts wait between navigations
+# and exponentially increase the interval when captcha/rate-limit pages appear.
+crawl:
+  min_interval_seconds: 2.0
+  max_interval_seconds: 60.0
+  backoff_factor: 2.0
+  jitter_seconds: 0.5
+
 paths:
   data: "./data"
   logs: "./logs"

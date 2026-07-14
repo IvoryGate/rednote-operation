@@ -1,33 +1,49 @@
 import json
+from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import click
 
 from src.core.browser import Browser
+from src.core.config import config
+from src.core.crawl_parse import extract_notes_from_list, page_looks_rejected
 from src.core.db import SessionLocal, init_db
+from src.core.rate_limit import RateLimiter
 from src.models import Keyword
 
 
-def search_keyword(page: Any, keyword: str, sort: str, count: int) -> list[dict]:
-    results = []
+def _limiter() -> RateLimiter:
+    c = config.crawl
+    return RateLimiter(
+        min_interval=c.min_interval_seconds,
+        max_interval=c.max_interval_seconds,
+        backoff_factor=c.backoff_factor,
+        jitter=c.jitter_seconds,
+    )
+
+
+def search_keyword(page, keyword: str, sort: str, count: int, limiter: RateLimiter) -> list[dict]:  # type: ignore[no-untyped-def]
+    results: list[dict] = []
     try:
         url = f"https://www.xiaohongshu.com/search_result?keyword={keyword}&sort={sort}"
-        page.goto(url)
-        page.wait_for_timeout(5000)
-        cards = page.query_selector_all("section.reds-note-card")
-        for card in cards[:count]:
-            title_el = card.query_selector(".note-title")
-            img_el = card.query_selector("img")
-            results.append(
-                {
-                    "keyword": keyword,
-                    "title": title_el.inner_text() if title_el else "",
-                    "cover": img_el.get_attribute("src") if img_el else "",
-                }
+        limiter.wait()
+        page.goto(url, wait_until="domcontentloaded")
+        page.wait_for_timeout(2000)
+        if page_looks_rejected(page):
+            limiter.on_reject()
+            click.echo(
+                f"  Reject signal for keyword={keyword}; backoff={limiter.current_interval:.1f}s"
             )
-    except Exception:
-        pass
+            return results
+        limiter.on_success()
+        cards = extract_notes_from_list(page)
+        for item in cards[:count]:
+            item = dict(item)
+            item["keyword"] = keyword
+            results.append(item)
+    except Exception as exc:
+        click.echo(f"  Search failed for {keyword}: {exc}")
+        limiter.on_reject()
     return results
 
 
@@ -55,7 +71,9 @@ def main(  # type: ignore[no-untyped-def]
     session_account,
 ) -> None:
     """Search trending topics and notes on Xiaohongshu."""
+    del days  # reserved for future date filtering
     keywords = list(keyword)
+    limiter = _limiter()
 
     if keywords_file:
         with open(keywords_file) as f:
@@ -80,29 +98,31 @@ def main(  # type: ignore[no-untyped-def]
         click.echo("Provide --keyword or --keywords-file")
         return
 
-    all_results = {}
-    with Browser() as browser:
-        ctx = browser.session_context(session_account)
+    all_results: dict[str, list] = {}
+    with Browser(headless=headless or None) as browser:
+        ctx = browser.session_context(session_account, rotate_identity=True)
         page = ctx.new_page()
         for kw in keywords:
             click.echo(f"Searching: {kw}")
-            results = search_keyword(page, kw, sort, count)
+            results = search_keyword(page, kw, sort, count, limiter)
             all_results[kw] = results
             click.echo(f"  Found {len(results)} notes")
 
     if to_db:
         init_db()
         db = SessionLocal()
-        for kw, results in all_results.items():
-            keyword_entry = db.query(Keyword).filter(Keyword.keyword == kw).first()
-            if not keyword_entry:
-                keyword_entry = Keyword(keyword=kw, search_volume=len(results))
-                db.add(keyword_entry)
-            else:
-                keyword_entry.search_volume = len(results)
-            keyword_entry.updated_at = __import__("datetime").datetime.now()
-        db.commit()
-        db.close()
+        try:
+            for kw, results in all_results.items():
+                keyword_entry = db.query(Keyword).filter(Keyword.keyword == kw).first()
+                if not keyword_entry:
+                    keyword_entry = Keyword(keyword=kw, search_volume=len(results))
+                    db.add(keyword_entry)
+                else:
+                    keyword_entry.search_volume = len(results)
+                keyword_entry.updated_at = datetime.now()
+            db.commit()
+        finally:
+            db.close()
 
     if output:
         path = Path(output)

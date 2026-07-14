@@ -1,45 +1,40 @@
 import json
 from pathlib import Path
-from typing import Any
 
 import click
 
 from src.core.browser import Browser
+from src.core.config import config
+from src.core.crawl_parse import (
+    extract_note_detail,
+    extract_notes_from_list,
+    note_fields_for_db,
+    page_looks_rejected,
+)
 from src.core.db import SessionLocal, init_db
+from src.core.rate_limit import RateLimiter
 from src.models import Note
 
 
-def extract_note_data(page: Any) -> dict:
-    try:
-        title = page.query_selector("title")
-        content = page.query_selector("meta[name=description]")
-        return {
-            "title": title.inner_text() if title else "",
-            "content": content.get_attribute("content") if content else "",
-            "url": page.url,
-        }
-    except Exception:
-        return {}
+def _limiter() -> RateLimiter:
+    c = config.crawl
+    return RateLimiter(
+        min_interval=c.min_interval_seconds,
+        max_interval=c.max_interval_seconds,
+        backoff_factor=c.backoff_factor,
+        jitter=c.jitter_seconds,
+    )
 
 
-def extract_notes_from_list(page: Any) -> list[dict]:
-    results = []
-    try:
-        cards = page.query_selector_all("section.reds-note-card")
-        for card in cards:
-            title_el = card.query_selector(".note-title")
-            author_el = card.query_selector(".author")
-            img_el = card.query_selector("img")
-            results.append(
-                {
-                    "title": title_el.inner_text() if title_el else "",
-                    "author": author_el.inner_text() if author_el else "",
-                    "cover": img_el.get_attribute("src") if img_el else "",
-                }
-            )
-    except Exception:
-        pass
-    return results
+def _goto(page, url: str, limiter: RateLimiter) -> None:  # type: ignore[no-untyped-def]
+    limiter.wait()
+    page.goto(url, wait_until="domcontentloaded")
+    page.wait_for_timeout(1500)
+    if page_looks_rejected(page):
+        limiter.on_reject()
+        click.echo(f"  Rate-limit/captcha signal on {url}; backoff={limiter.current_interval:.1f}s")
+    else:
+        limiter.on_success()
 
 
 @click.command()
@@ -56,31 +51,48 @@ def main(  # type: ignore[no-untyped-def]
 ) -> None:
     """Collect notes from Xiaohongshu."""
     results = []
+    limiter = _limiter()
 
-    with Browser() as browser:
-        ctx = browser.session_context(session_account)
+    with Browser(headless=headless or None) as browser:
+        ctx = browser.session_context(session_account, rotate_identity=True)
         page = ctx.new_page()
 
         if url:
-            page.goto(url)
-            data = extract_note_data(page)
+            _goto(page, url, limiter)
+            data = extract_note_detail(page)
             if data:
                 results.append(data)
         elif user_id:
-            page.goto(f"https://www.xiaohongshu.com/user/profile/{user_id}")
+            _goto(page, f"https://www.xiaohongshu.com/user/profile/{user_id}", limiter)
             results = extract_notes_from_list(page)[:count]
         elif query:
-            page.goto(f"https://www.xiaohongshu.com/search_result?keyword={query}")
+            _goto(page, f"https://www.xiaohongshu.com/search_result?keyword={query}", limiter)
             results = extract_notes_from_list(page)[:count]
+        else:
+            click.echo("Provide --url, --user-id, or --query")
+            return
 
     if to_db and results:
         init_db()
         db = SessionLocal()
-        for item in results:
-            note = Note(**item)
-            db.add(note)
-        db.commit()
-        db.close()
+        try:
+            saved = 0
+            for item in results:
+                fields = note_fields_for_db(item)
+                if not fields.get("note_id"):
+                    continue
+                existing = db.query(Note).filter(Note.note_id == fields["note_id"]).first()
+                if existing:
+                    for key, value in fields.items():
+                        if key != "note_id" and value is not None:
+                            setattr(existing, key, value)
+                else:
+                    db.add(Note(**fields))
+                    saved += 1
+            db.commit()
+            click.echo(f"Saved {saved} new notes to DB")
+        finally:
+            db.close()
 
     if output and results:
         path = Path(output)

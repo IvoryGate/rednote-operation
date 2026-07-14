@@ -6,38 +6,44 @@ from typing import Any
 import click
 
 from src.core.browser import Browser
+from src.core.config import config
+from src.core.crawl_parse import extract_notes_from_list, note_fields_for_db, page_looks_rejected
 from src.core.db import SessionLocal, init_db
+from src.core.rate_limit import RateLimiter
 from src.models import Competitor, Note
 
 
 def extract_metrics(page: Any) -> dict:
     try:
-        follower_el = page.query_selector("[class*=follower]")
-        note_count_el = page.query_selector("[class*=note-count]")
+        follower_el = page.query_selector("[class*=follower], [class*=fans]")
+        note_count_el = page.query_selector("[class*=note-count], [class*=notes]")
         return {
-            "followers": int(follower_el.inner_text()) if follower_el else 0,
-            "notes_count": int(note_count_el.inner_text()) if note_count_el else 0,
+            "followers": _safe_int(follower_el.inner_text() if follower_el else "0"),
+            "notes_count": _safe_int(note_count_el.inner_text() if note_count_el else "0"),
         }
     except Exception:
         return {"followers": 0, "notes_count": 0}
 
 
-def extract_notes(page: Any) -> list[dict]:
-    results = []
-    try:
-        cards = page.query_selector_all("section.reds-note-card")
-        for card in cards:
-            title_el = card.query_selector(".note-title")
-            like_el = card.query_selector("[class*=like]")
-            results.append(
-                {
-                    "title": title_el.inner_text() if title_el else "",
-                    "like_count": int(like_el.inner_text()) if like_el else 0,
-                }
-            )
-    except Exception:
-        pass
-    return results
+def _safe_int(text: str) -> int:
+    import re
+
+    text = text.strip().replace(",", "")
+    match = re.search(r"([\d.]+)\s*万", text)
+    if match:
+        return int(float(match.group(1)) * 10000)
+    digits = re.sub(r"[^\d]", "", text)
+    return int(digits) if digits else 0
+
+
+def _limiter() -> RateLimiter:
+    c = config.crawl
+    return RateLimiter(
+        min_interval=c.min_interval_seconds,
+        max_interval=c.max_interval_seconds,
+        backoff_factor=c.backoff_factor,
+        jitter=c.jitter_seconds,
+    )
 
 
 @click.command()
@@ -57,6 +63,7 @@ def main(  # type: ignore[no-untyped-def]
     """Monitor competitor accounts on Xiaohongshu."""
     init_db()
     db = SessionLocal()
+    limiter = _limiter()
 
     if list_only:
         competitors = db.query(Competitor).all()
@@ -87,30 +94,36 @@ def main(  # type: ignore[no-untyped-def]
             competitor.competitor_url
             or f"https://www.xiaohongshu.com/user/profile/{competitor.competitor_name}"
         )
-        with Browser() as browser:
-            ctx = browser.session_context(session_account)
+        with Browser(headless=headless or None) as browser:
+            ctx = browser.session_context(session_account, rotate_identity=True)
             page = ctx.new_page()
-            page.goto(url)
+            limiter.wait()
+            page.goto(url, wait_until="domcontentloaded")
+            page.wait_for_timeout(1500)
+            if page_looks_rejected(page):
+                limiter.on_reject()
+                click.echo(
+                    f"  Reject signal for {competitor.competitor_name}; "
+                    f"backoff={limiter.current_interval:.1f}s"
+                )
+            else:
+                limiter.on_success()
 
             metrics = extract_metrics(page)
-            notes_data = extract_notes(page)
-            notes_data = notes_data[:50]
+            notes_data = extract_notes_from_list(page)[:50]
 
         cutoff = datetime.now() - timedelta(days=days)
         new_notes = 0
         for item in notes_data:
-            existing = db.query(Note).filter(Note.note_id == item.get("note_id")).first()
+            fields = note_fields_for_db(item)
+            note_id = fields.get("note_id")
+            if not note_id:
+                continue
+            existing = db.query(Note).filter(Note.note_id == note_id).first()
             if not existing:
                 note = Note(
                     account_id=competitor.id,
-                    note_id=item["note_id"],
-                    title=item.get("title"),
-                    like_count=item.get("like_count", 0),
-                    collect_count=item.get("collect_count", 0),
-                    comment_count=item.get("comment_count", 0),
-                    share_count=item.get("share_count", 0),
-                    url=item.get("url"),
-                    published_at=item.get("published_at"),
+                    **{k: v for k, v in fields.items() if k != "account_id"},
                 )
                 db.add(note)
                 new_notes += 1
@@ -139,6 +152,7 @@ def main(  # type: ignore[no-untyped-def]
             "avg_comments": competitor.avg_comments,
             "new_notes": new_notes,
             "updated_at": competitor.updated_at.isoformat(),
+            "notes": notes_data,
         }
 
     results = []
